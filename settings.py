@@ -137,6 +137,7 @@ def save_attachment(msg, download_folder):
     att_path = []
     flag = 0
     filename = None
+    file_seq = file_no(4)
     for part in msg.walk():
         z = part.get_filename()
         z1 = part.get_content_type()
@@ -148,10 +149,10 @@ def save_attachment(msg, download_folder):
         filename = part.get_filename()
         if filename is not None and file_blacklist(filename):
             if not os.path.isfile(filename):
-                fp = open(os.path.join(download_folder, file_no(4) + filename), 'wb')
+                fp = open(os.path.join(download_folder, file_seq + filename), 'wb')
                 fp.write(part.get_payload(decode=True))
                 fp.close()
-                att_path.append(os.path.join(download_folder, file_no(4) + filename))
+                att_path.append(os.path.join(download_folder, file_seq + filename))
     if flag == 0 or filename is None or len(att_path) == 0:
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
