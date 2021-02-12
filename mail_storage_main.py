@@ -5,6 +5,13 @@ import pytz
 from settings import hospital_data, pdfconfig, file_no, file_blacklist, conn_data, interval
 from mail_storage import gmail_api, graph_api, imap_, get_folders, get_ins_process, create_settlement_folder
 
+def mail_mover(hospital):
+    #select unmoved mails
+    #create entry in mail tables
+    #copy file
+    #change flag in root table
+    pass
+
 def mail_storage(hospital, fromtime, totime, deferred):
     for hosp, data in hospital_data.items():
         if data['mode'] == 'gmail_api' and hosp == hospital:
