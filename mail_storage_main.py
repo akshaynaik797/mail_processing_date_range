@@ -3,7 +3,7 @@ from datetime import datetime
 import pytz
 
 from settings import hospital_data, pdfconfig, file_no, file_blacklist, conn_data, interval
-from mail_storage import gmail_api, graph_api, imap_, get_folders, get_ins_process
+from mail_storage import gmail_api, graph_api, imap_, get_folders, get_ins_process, create_settlement_folder
 
 def mail_storage(hospital, fromtime, totime, deferred):
     for hosp, data in hospital_data.items():
@@ -27,4 +27,5 @@ if __name__ == '__main__':
     # subject = 'Pre Auth Approved - Hosp. Name : Max Balaji Hospital - Claimant : Sunaina Bindroo'
     # email = 'claims@mediassistindia.com'
     # a = get_ins_process(subject, email)
-    mail_storage('noble', '11/02/2021 18:00:00', '12/02/2021 12:00:00', 'X')
+    # create_settlement_folder('ils', 'bajaj', '11/02/2021 18:00:00', '/home/akshay/PycharmProjects/mail_processing_date_range/noble/new_attach/36550151_.pdf')
+    mail_storage('ils_howrah', '11/02/2021 18:00:00', '12/02/2021 12:00:00', 'X')

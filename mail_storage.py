@@ -4,9 +4,12 @@ import imaplib
 import os.path
 import pickle
 import time
+from pathlib import Path
 from datetime import datetime, timedelta
 import json
 import logging
+from shutil import copyfile
+
 import pytz
 
 import mysql.connector
@@ -24,8 +27,17 @@ from email.header import decode_header
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment
 
-all_mails_fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred")
+# all_mails_fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred")
 
+def create_settlement_folder(hosp, ins, date, filepath):
+    try:
+        date = datetime.strptime(date, '%d/%m/%Y %H:%M:%S').strftime('%m%d%Y%H%M%S')
+        folder = os.path.join(hosp, "letters", f"{ins}_{date}")
+        dst = os.path.join(folder, os.path.split(filepath)[-1])
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        copyfile(filepath, dst)
+    except:
+        log_exceptions(hosp=hosp, ins=ins, date=date, filepath=filepath)
 def get_ins_process(subject, email):
     ins, process = "", ""
     q1 = "select IC from email_ids where email_ids=%s"
@@ -202,10 +214,12 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                                         print(filename)
                                         pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
                                         flag = 1
+                            if process == 'settlement':
+                                create_settlement_folder(hosp, ins, date, filename)
                             with mysql.connector.connect(**conn_data) as con:
                                 cur = con.cursor()
-                                q = f"insert into {hosp}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                                data = (id, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender)
+                                q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                                data = (id, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender, hosp, ins, process, deferred)
                                 cur.execute(q, data)
                                 con.commit()
                         except:
@@ -288,11 +302,13 @@ def graph_api(data, hosp, fromtime, totime, deferred):
                                         pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
                                         attach_path = filename
                                 # print(date, subject, attach_path, sender, sep='|')
+                                if process == 'settlement':
+                                    create_settlement_folder(hosp, ins, date, attach_path)
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
-                                    q = f"insert into {hosp}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+                                    q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                                     data = (
-                                    i['id'], subject, date, str(datetime.now()), os.path.abspath(attach_path), '', sender)
+                                    i['id'], subject, date, str(datetime.now()), os.path.abspath(attach_path), '', sender, hosp, ins, process, deferred)
                                     cur.execute(q, data)
                                     con.commit()
                                     print(datetime.now(), ' saved mail in db')
@@ -352,10 +368,12 @@ def imap_(data, hosp, fromtime, totime, deferred):
                         filename = a[-1]
                     with open(f'logs/{hosp}_mails.log', 'a') as fp:
                         print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
+                    if process == 'settlement':
+                        create_settlement_folder(hosp, ins, date, filename)
                     with mysql.connector.connect(**conn_data) as con:
                         cur = con.cursor()
-                        q = f"insert into {table} (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`, `sender`) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                        data = (mid, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender)
+                        q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                        data = (mid, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender, hosp, ins, process, deferred)
                         cur.execute(q, data)
                         con.commit()
                         with open(f'logs/{hosp}_mails_in_db.log', 'a') as fp:
