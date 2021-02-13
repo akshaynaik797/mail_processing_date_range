@@ -25,7 +25,9 @@ from email.header import decode_header
 
 
 from make_log import log_exceptions, custom_log_data
-from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment
+from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
+    hospital_data
+
 
 # all_mails_fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred")
 
@@ -38,6 +40,7 @@ def create_settlement_folder(hosp, ins, date, filepath):
         copyfile(filepath, dst)
     except:
         log_exceptions(hosp=hosp, ins=ins, date=date, filepath=filepath)
+
 def get_ins_process(subject, email):
     ins, process = "", ""
     q1 = "select IC from email_ids where email_ids=%s"
@@ -114,6 +117,9 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
         #############
         # results = service.users().labels().list(userId='me').execute()
         # labels = results.get('labels', [])
+        # for i in labels:
+        #     with open('folders.csv', 'a') as fp:
+        #         print(hosp, i['id'], file=fp, sep=',')
         #############
         for folder in get_folders(hosp):
             q = f"after:{fromtime} before:{totime}"
@@ -382,3 +388,51 @@ def imap_(data, hosp, fromtime, totime, deferred):
                     log_exceptions(subject=subject, date=date, hosp=hosp)
     except:
         log_exceptions(hosp=hosp)
+
+def mail_mover(hospital, deferred):
+    fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
+    q = "select * from all_mails where deferred=%s and hospital=%s"
+    records = []
+    folder = f"../{hospital}/new_attach"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, (deferred, hospital,))
+        result = cur.fetchall()
+        for i in result:
+            temp = {}
+            for key, value in zip(fields, i):
+                temp[key] = value
+            records.append(temp)
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        for i in records:
+            dst = os.path.join(folder, os.path.split(i["attach_path"])[-1])
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            copyfile(i["attach_path"], dst)
+            q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
+            data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
+            cur.execute(q, data)
+            q = "update all_mails set deferred='MOVED' where sno=%s"
+            cur.execute(q, (i['sno'],))
+            con.commit()
+
+def mail_storage(hospital, fromtime, totime, deferred):
+    for hosp, data in hospital_data.items():
+        if data['mode'] == 'gmail_api' and hosp == hospital:
+            print(hosp)
+            fromtime = int(datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').timestamp())
+            totime = int(datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').timestamp())
+            gmail_api(data, hosp, fromtime, totime, deferred)
+        elif data['mode'] == 'graph_api' and hosp == hospital:
+            print(hosp) #.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            fromtime = datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            totime = datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            graph_api(data, hosp, fromtime, totime, deferred)
+        elif data['mode'] == 'imap_' and hosp == hospital:
+            print(hosp)
+            fromtime = datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').strftime('%d-%b-%Y')
+            totime = datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').strftime('%d-%b-%Y')
+            imap_(data, hosp, fromtime, totime, deferred)
+
+if __name__ == '__main__':
+    mail_mover('noble', 'X')
