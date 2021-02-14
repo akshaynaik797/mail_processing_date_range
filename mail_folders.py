@@ -62,12 +62,9 @@ def get_ins_process(subject, email):
                         return (result1[0], pro)
     return ins, process
 
-def get_folders(hospital, deferred):
+def get_folders(hospital):
     result = []
-    if deferred == 'X':
-        q = "select historical from mail_folder_config where hospital=%s"
-    else:
-        q = "select current from mail_folder_config where hospital=%s and current != ''"
+    q = "select name from mail_folder_config where active=1 and hospital=%s"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q, (hospital,))
@@ -124,7 +121,7 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
         #     with open('folders.csv', 'a') as fp:
         #         print(hosp, i['id'], file=fp, sep=',')
         #############
-        for folder in get_folders(hosp, deferred):
+        for folder in get_folders(hosp):
             q = f"after:{fromtime} before:{totime}"
             results = service.users().messages()
             request = results.list(userId='me', labelIds=[folder], q=q)
@@ -257,70 +254,17 @@ def graph_api(data, hosp, fromtime, totime, deferred):
         after = after.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         if "access_token" in result:
             flag = 0
-            for folder in get_folders(hosp, deferred):
+            for folder in get_folders(hosp):
                 while 1:
                     if flag == 0:
-                        query = f"https://graph.microsoft.com/v1.0/users/{email}" \
-                                f"/mailFolders/{folder}/messages?$filter=(receivedDateTime ge {fromtime} and receivedDateTime lt {totime})"
+                        query = query = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/"
                     flag = 1
-                    print(datetime.now(), ' quering graph api')
                     graph_data2 = requests.get(query,
                                                headers={'Authorization': 'Bearer ' + result['access_token']}, ).json()
                     if 'value' in graph_data2:
                         for i in graph_data2['value']:
-                            print(datetime.now(), ' got mails')
-                            try:
-                                print(datetime.now(), ' saving mail in db')
-                                date, subject, attach_path, sender = '', '', '', ''
-                                format = "%Y-%m-%dT%H:%M:%SZ"
-                                b = datetime.strptime(i['receivedDateTime'], format).replace(tzinfo=pytz.utc).astimezone(
-                                    pytz.timezone('Asia/Kolkata')).replace(
-                                    tzinfo=None)
-                                b = b.strftime('%d/%m/%Y %H:%M:%S')
-                                date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
-                                ins, process = get_ins_process(subject, sender)
-                                # print(i['receivedDateTime'], b, i['subject'])
-                                # print(i['sender']['emailAddress']['address'])
-                                if i['hasAttachments'] is True:
-                                    q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/inbox/messages/{i['id']}/attachments"
-                                    attach_data = requests.get(q,
-                                                               headers={'Authorization': 'Bearer ' + result[
-                                                                   'access_token']}, ).json()
-                                    for j in attach_data['value']:
-                                        if '@odata.mediaContentType' in j:
-                                            j['name'] = j['name'].replace('.PDF', '.pdf')
-                                            # print(j['@odata.mediaContentType'], j['name'])
-                                            if file_blacklist(j['name']):
-                                                j['name'] = file_no(4) + j['name']
-                                                with open(os.path.join(attachfile_path, j['name']), 'w+b') as fp:
-                                                    fp.write(base64.b64decode(j['contentBytes']))
-                                                attach_path = os.path.join(attachfile_path, j['name'])
-                                else:
-                                    filename = attachfile_path + file_no(8) + '.pdf'
-                                    if i['body']['contentType'] == 'html':
-                                        with open(attachfile_path + 'temp.html', 'w') as fp:
-                                            fp.write(i['body']['content'])
-                                        pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
-                                        attach_path = filename
-                                    elif i['body']['contentType'] == 'text':
-                                        with open(attachfile_path + 'temp.text', 'w') as fp:
-                                            fp.write(i['body']['content'])
-                                        pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
-                                        attach_path = filename
-                                # print(date, subject, attach_path, sender, sep='|')
-                                if process == 'settlement':
-                                    create_settlement_folder(hosp, ins, date, attach_path)
-                                with mysql.connector.connect(**conn_data) as con:
-                                    cur = con.cursor()
-                                    q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                                    data = (
-                                    i['id'], subject, date, str(datetime.now()), os.path.abspath(attach_path), '', sender, hosp, ins, process, deferred)
-                                    cur.execute(q, data)
-                                    con.commit()
-                                    print(datetime.now(), ' saved mail in db')
-                                    print(date, subject, attach_path, sender, sep='|')
-                            except:
-                                log_exceptions(mid=i['id'], hosp=hosp)
+                            with open('folders.csv', 'a') as fp:
+                                print(hosp, i['displayName'], file=fp, sep=',')
                     else:
                         with open('logs/query.log', 'a') as fp:
                             print(query, file=fp)
@@ -340,10 +284,12 @@ def imap_(data, hosp, fromtime, totime, deferred):
         imap_server = imaplib.IMAP4_SSL(host=server)
         table = f'{hosp}_mails'
         imap_server.login(email_id, password)
-        # for i in imap_server.list()[1]:
-        #     l = i.decode().split(' "/" ')
-        #     print(l[0] + " = " + l[1])
-        for folder in get_folders(hosp, deferred):
+        for i in imap_server.list()[1]:
+            l = i.decode().split(' "/" ')
+            print(l[0] + " = " + l[1])
+            with open('folders.csv', 'a') as fp:
+                print(hosp, l[1].replace('"', ''), file=fp, sep=',')
+        for folder in get_folders(hosp):
             imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
             # Find all emails in inbox and print out the raw email data
             # _, message_numbers_raw = imap_server.search(None, 'ALL')
@@ -435,5 +381,4 @@ def mail_storage(hospital, fromtime, totime, deferred):
             imap_(data, hosp, fromtime, totime, deferred)
 
 if __name__ == '__main__':
-    a = get_folders('ils', 'X')
-    pass
+    mail_mover('noble', 'X')
