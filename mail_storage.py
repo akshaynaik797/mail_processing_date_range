@@ -55,6 +55,10 @@ def get_ins_process(subject, email):
             cur.execute(q2, (ic_id,))
             result = cur.fetchall()
             for sub, pro in result:
+                if 'Intimation No' in subject:
+                    return ('big', 'settlement')
+                if 'STAR HEALTH AND ALLIED INSUR04239' in subject:
+                    return ('small', 'settlement')
                 if sub in subject:
                     cur.execute(q3, (ic_id,))
                     result1 = cur.fetchone()
@@ -125,6 +129,8 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
         #         print(hosp, i['id'], file=fp, sep=',')
         #############
         for folder in get_folders(hosp, deferred):
+            with open('logs/folders.log', 'a') as tfp:
+                print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
             q = f"after:{fromtime} before:{totime}"
             results = service.users().messages()
             request = results.list(userId='me', labelIds=[folder], q=q)
@@ -258,6 +264,9 @@ def graph_api(data, hosp, fromtime, totime, deferred):
         if "access_token" in result:
             flag = 0
             for folder in get_folders(hosp, deferred):
+                with open('logs/folders.log', 'a') as tfp:
+                    print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
+                flag = 0
                 while 1:
                     if flag == 0:
                         query = f"https://graph.microsoft.com/v1.0/users/{email}" \
@@ -344,6 +353,8 @@ def imap_(data, hosp, fromtime, totime, deferred):
         #     l = i.decode().split(' "/" ')
         #     print(l[0] + " = " + l[1])
         for folder in get_folders(hosp, deferred):
+            with open('logs/folders.log', 'a') as tfp:
+                print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
             imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
             # Find all emails in inbox and print out the raw email data
             # _, message_numbers_raw = imap_server.search(None, 'ALL')
@@ -435,5 +446,5 @@ def mail_storage(hospital, fromtime, totime, deferred):
             imap_(data, hosp, fromtime, totime, deferred)
 
 if __name__ == '__main__':
-    a = get_folders('ils', 'X')
+    a = get_folders('noble', 'X')
     pass
