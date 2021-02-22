@@ -32,14 +32,18 @@ from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, f
 # all_mails_fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred")
 
 def create_settlement_folder(hosp, ins, date, filepath):
+    root = '../index/'
+    dst = ""
     try:
         date = datetime.strptime(date, '%d/%m/%Y %H:%M:%S').strftime('%m%d%Y%H%M%S')
-        folder = os.path.join(hosp, "letters", f"{ins}_{date}")
+        today = datetime.now().strftime("%d_%m_%Y")
+        folder = os.path.join(root, today, hosp, "letters", f"{ins}_{date}")
         dst = os.path.join(folder, os.path.split(filepath)[-1])
         Path(folder).mkdir(parents=True, exist_ok=True)
         copyfile(filepath, dst)
     except:
         log_exceptions(hosp=hosp, ins=ins, date=date, filepath=filepath)
+    return os.path.abspath(dst)
 
 def get_ins_process(subject, email):
     ins, process = "", ""
@@ -447,5 +451,5 @@ def mail_storage(hospital, fromtime, totime, deferred):
             imap_(data, hosp, fromtime, totime, deferred)
 
 if __name__ == '__main__':
-    a = get_ins_process('STAR HEALTH AND ALLIED INSUR04239 - 00040350005154', 'Enetadvicemailing@hdfcbank.net')
+    create_settlement_folder('a', 'b', '01/01/2021 12:12:12', 'a')
     pass
