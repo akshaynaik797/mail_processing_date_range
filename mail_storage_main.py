@@ -7,5 +7,5 @@ def process_mails_in_range(hospital, fromtime, totime, deferred):
         mail_mover(hospital, deferred)
 
 if __name__ == '__main__':
-    for i in ['ils', 'ils_dumdum', 'ils_howrah', 'ils_agartala']:
+    for i in ['ils_agartala']:
         mail_storage(i, "25/01/2021 12:00:00", "31/01/2021 23:59:00", "X")

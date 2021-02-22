@@ -355,7 +355,8 @@ def imap_(data, hosp, fromtime, totime, deferred):
         for folder in get_folders(hosp, deferred):
             with open('logs/folders.log', 'a') as tfp:
                 print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
-            imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
+            imap_server.select()
+            # imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
             # Find all emails in inbox and print out the raw email data
             # _, message_numbers_raw = imap_server.search(None, 'ALL')
             _, message_numbers_raw = imap_server.search(None, f'(SINCE "{fromtime}" BEFORE "{totime}")')
@@ -446,5 +447,5 @@ def mail_storage(hospital, fromtime, totime, deferred):
             imap_(data, hosp, fromtime, totime, deferred)
 
 if __name__ == '__main__':
-    a = get_folders('noble', 'X')
+    a = get_ins_process('STAR HEALTH AND ALLIED INSUR04239 - 00040350005154', 'Enetadvicemailing@hdfcbank.net')
     pass
