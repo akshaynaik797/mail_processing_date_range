@@ -4,6 +4,7 @@ import imaplib
 import os.path
 import pickle
 import time
+import signal
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
@@ -26,10 +27,15 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data
+    hospital_data, timeout
 
 
-# all_mails_fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred")
+class TimeOutException(Exception):
+    pass
+
+def alarm_handler(signum, frame):
+    print("ALARM signal received")
+    raise TimeOutException()
 
 def create_settlement_folder(hosp, ins, date, filepath):
     root = '../index/'
@@ -148,6 +154,8 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                 else:
                     print("Message snippets:")
                     for message in messages[::-1]:
+                        signal.signal(signal.SIGALRM, alarm_handler)
+                        signal.alarm(timeout)
                         try:
                             id, subject, date, filename, sender = '', '', '', '', ''
                             msg = service.users().messages().get(userId='me', id=message['id']).execute()
@@ -243,6 +251,7 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                                 con.commit()
                         except:
                             log_exceptions(id=id, hosp=hosp)
+                        signal.alarm(0)
                 request = results.list_next(request, msg_col)
 
     except:
@@ -282,6 +291,8 @@ def graph_api(data, hosp, fromtime, totime, deferred):
                     if 'value' in graph_data2:
                         for i in graph_data2['value']:
                             print(datetime.now(), ' got mails')
+                            signal.signal(signal.SIGALRM, alarm_handler)
+                            signal.alarm(timeout)
                             try:
                                 print(datetime.now(), ' saving mail in db')
                                 date, subject, attach_path, sender = '', '', '', ''
@@ -334,6 +345,7 @@ def graph_api(data, hosp, fromtime, totime, deferred):
                                     print(date, subject, attach_path, sender, sep='|')
                             except:
                                 log_exceptions(mid=i['id'], hosp=hosp)
+                            signal.alarm(0)
                     else:
                         with open('logs/query.log', 'a') as fp:
                             print(query, file=fp)
@@ -365,6 +377,8 @@ def imap_(data, hosp, fromtime, totime, deferred):
             # _, message_numbers_raw = imap_server.search(None, 'ALL')
             _, message_numbers_raw = imap_server.search(None, f'(SINCE "{fromtime}" BEFORE "{totime}")')
             for message_number in message_numbers_raw[0].split():
+                signal.signal(signal.SIGALRM, alarm_handler)
+                signal.alarm(timeout)
                 try:
                     _, msg = imap_server.fetch(message_number, '(RFC822)')
                     message = email.message_from_bytes(msg[0][1])
@@ -402,6 +416,7 @@ def imap_(data, hosp, fromtime, totime, deferred):
                             print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
                 except:
                     log_exceptions(subject=subject, date=date, hosp=hosp)
+                signal.alarm(0)
     except:
         log_exceptions(hosp=hosp)
 
