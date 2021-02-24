@@ -53,13 +53,13 @@ def create_settlement_folder(hosp, ins, date, filepath):
 
 def get_ins_process(subject, email):
     ins, process = "", ""
-    q1 = "select IC from email_ids where email_ids=%s"
+    q1 = "select IC from email_ids where email_ids=%s limit 1"
     q2 = "select subject, table_name from email_master where ic_id=%s"
-    q3 = "select IC_name from IC_name where IC=%s"
+    q3 = "select IC_name from IC_name where IC=%s limit 1"
     with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
+        cur = con.cursor(buffered=True)
         cur.execute(q1, (email,))
-        result =cur.fetchone()
+        result = cur.fetchone()
         if result is not None:
             ic_id = result[0]
             cur.execute(q2, (ic_id,))
