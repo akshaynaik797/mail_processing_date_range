@@ -14,7 +14,7 @@ interval = 300 #seconds
 conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
              'user': "admin",
              'password': "Welcome1!",
-             'database': 'python_rep'}
+             'database': 'python'}
 
 pdfconfig = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')
 
@@ -82,7 +82,7 @@ def clean_filename(filename):
 def file_blacklist(filename, **kwargs):
     fp = filename
     filename, file_extension = os.path.splitext(fp)
-    ext = ['.pdf', '.htm', '.html']
+    ext = ['.pdf', '.htm', '.html', '.PDF']
     if file_extension not in ext:
         return False
     if 'email' in kwargs:
