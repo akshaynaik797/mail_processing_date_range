@@ -191,42 +191,35 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                             ins, process = get_ins_process(subject, sender)
                             custom_log_data(filename=hosp + '_mails', data=[id, subject, date, filename, sender])
                             flag = 0
-                            if 'parts' in msg['payload']:
-                                for j in msg['payload']['parts']:
-                                    if 'attachmentId' in j['body']:
-                                        temp = j['filename']
-                                        if file_blacklist(temp, email=sender):
-                                            filename = clean_filename(temp)
-                                            filename = attach_path + file_no(4) + filename
-                                            filename = filename.replace(' ', '')
-                                            a_id = j['body']['attachmentId']
-                                            attachment = service.users().messages().attachments().get(userId='me', messageId=id,
-                                                                                                      id=a_id).execute()
-                                            data = attachment['data']
-                                            with open(filename, 'wb') as fp:
-                                                fp.write(base64.urlsafe_b64decode(data))
-                                            print(filename)
-                                            flag = 1
-                            else:
-                                data = msg['payload']['body']['data']
-                                filename = attach_path + file_no(8) + '.pdf'
-                                with open(attach_path + 'temp.html', 'wb') as fp:
-                                    fp.write(base64.urlsafe_b64decode(data))
-                                print(filename)
-                                pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
-                                flag = 1
-                            if flag == 0:
-                                if 'data' in msg['payload']['parts'][-1]['body']:
-                                    data = msg['payload']['parts'][-1]['body']['data']
+                            filename = ""
+                            try:
+                                if 'parts' in msg['payload']:
+                                    for j in msg['payload']['parts']:
+                                        if 'attachmentId' in j['body']:
+                                            temp = j['filename']
+                                            if file_blacklist(temp, email=sender):
+                                                filename = clean_filename(temp)
+                                                filename = attach_path + file_no(4) + filename
+                                                filename = filename.replace(' ', '')
+                                                a_id = j['body']['attachmentId']
+                                                attachment = service.users().messages().attachments().get(userId='me', messageId=id,
+                                                                                                          id=a_id).execute()
+                                                data = attachment['data']
+                                                with open(filename, 'wb') as fp:
+                                                    fp.write(base64.urlsafe_b64decode(data))
+                                                print(filename)
+                                                flag = 1
+                                else:
+                                    data = msg['payload']['body']['data']
                                     filename = attach_path + file_no(8) + '.pdf'
                                     with open(attach_path + 'temp.html', 'wb') as fp:
                                         fp.write(base64.urlsafe_b64decode(data))
                                     print(filename)
                                     pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
                                     flag = 1
-                                else:
-                                    if 'data' in msg['payload']['parts'][0]['parts'][-1]['body']:
-                                        data = msg['payload']['parts'][0]['parts'][-1]['body']['data']
+                                if flag == 0:
+                                    if 'data' in msg['payload']['parts'][-1]['body']:
+                                        data = msg['payload']['parts'][-1]['body']['data']
                                         filename = attach_path + file_no(8) + '.pdf'
                                         with open(attach_path + 'temp.html', 'wb') as fp:
                                             fp.write(base64.urlsafe_b64decode(data))
@@ -234,15 +227,26 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                                         pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
                                         flag = 1
                                     else:
-                                        data = msg['payload']['parts'][0]['parts'][-1]['parts'][-1]['body']['data']
-                                        filename = attach_path + file_no(8) + '.pdf'
-                                        with open(attach_path + 'temp.html', 'wb') as fp:
-                                            fp.write(base64.urlsafe_b64decode(data))
-                                        print(filename)
-                                        pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
-                                        flag = 1
-                            if process == 'settlement':
-                                filename = create_settlement_folder(hosp, ins, date, filename)
+                                        if 'data' in msg['payload']['parts'][0]['parts'][-1]['body']:
+                                            data = msg['payload']['parts'][0]['parts'][-1]['body']['data']
+                                            filename = attach_path + file_no(8) + '.pdf'
+                                            with open(attach_path + 'temp.html', 'wb') as fp:
+                                                fp.write(base64.urlsafe_b64decode(data))
+                                            print(filename)
+                                            pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                            flag = 1
+                                        else:
+                                            data = msg['payload']['parts'][0]['parts'][-1]['parts'][-1]['body']['data']
+                                            filename = attach_path + file_no(8) + '.pdf'
+                                            with open(attach_path + 'temp.html', 'wb') as fp:
+                                                fp.write(base64.urlsafe_b64decode(data))
+                                            print(filename)
+                                            pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                            flag = 1
+                                if process == 'settlement':
+                                    filename = create_settlement_folder(hosp, ins, date, filename)
+                            except:
+                                pass
                             with mysql.connector.connect(**conn_data) as con:
                                 cur = con.cursor()
                                 q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -305,35 +309,39 @@ def graph_api(data, hosp, fromtime, totime, deferred):
                                 ins, process = get_ins_process(subject, sender)
                                 # print(i['receivedDateTime'], b, i['subject'])
                                 # print(i['sender']['emailAddress']['address'])
-                                if i['hasAttachments'] is True:
-                                    q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/inbox/messages/{i['id']}/attachments"
-                                    attach_data = requests.get(q,
-                                                               headers={'Authorization': 'Bearer ' + result[
-                                                                   'access_token']}, ).json()
-                                    for j in attach_data['value']:
-                                        if '@odata.mediaContentType' in j:
-                                            j['name'] = j['name'].replace('.PDF', '.pdf')
-                                            # print(j['@odata.mediaContentType'], j['name'])
-                                            if file_blacklist(j['name']):
-                                                j['name'] = file_no(4) + j['name']
-                                                with open(os.path.join(attachfile_path, j['name']), 'w+b') as fp:
-                                                    fp.write(base64.b64decode(j['contentBytes']))
-                                                attach_path = os.path.join(attachfile_path, j['name'])
-                                else:
-                                    filename = attachfile_path + file_no(8) + '.pdf'
-                                    if i['body']['contentType'] == 'html':
-                                        with open(attachfile_path + 'temp.html', 'w') as fp:
-                                            fp.write(i['body']['content'])
-                                        pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
-                                        attach_path = filename
-                                    elif i['body']['contentType'] == 'text':
-                                        with open(attachfile_path + 'temp.text', 'w') as fp:
-                                            fp.write(i['body']['content'])
-                                        pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
-                                        attach_path = filename
-                                # print(date, subject, attach_path, sender, sep='|')
-                                if process == 'settlement':
-                                    attach_path = create_settlement_folder(hosp, ins, date, attach_path)
+                                attach_path = ""
+                                try:
+                                    if i['hasAttachments'] is True:
+                                        q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/inbox/messages/{i['id']}/attachments"
+                                        attach_data = requests.get(q,
+                                                                   headers={'Authorization': 'Bearer ' + result[
+                                                                       'access_token']}, ).json()
+                                        for j in attach_data['value']:
+                                            if '@odata.mediaContentType' in j:
+                                                j['name'] = j['name'].replace('.PDF', '.pdf')
+                                                # print(j['@odata.mediaContentType'], j['name'])
+                                                if file_blacklist(j['name']):
+                                                    j['name'] = file_no(4) + j['name']
+                                                    with open(os.path.join(attachfile_path, j['name']), 'w+b') as fp:
+                                                        fp.write(base64.b64decode(j['contentBytes']))
+                                                    attach_path = os.path.join(attachfile_path, j['name'])
+                                    else:
+                                        filename = attachfile_path + file_no(8) + '.pdf'
+                                        if i['body']['contentType'] == 'html':
+                                            with open(attachfile_path + 'temp.html', 'w') as fp:
+                                                fp.write(i['body']['content'])
+                                            pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                            attach_path = filename
+                                        elif i['body']['contentType'] == 'text':
+                                            with open(attachfile_path + 'temp.text', 'w') as fp:
+                                                fp.write(i['body']['content'])
+                                            pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                            attach_path = filename
+                                    # print(date, subject, attach_path, sender, sep='|')
+                                    if process == 'settlement':
+                                        attach_path = create_settlement_folder(hosp, ins, date, attach_path)
+                                except:
+                                    pass
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
                                     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -396,16 +404,18 @@ def imap_(data, hosp, fromtime, totime, deferred):
                         subject = subject.replace(i, '').strip()
                     ins, process = get_ins_process(subject, sender)
                     mid = int(message_number)
-                    a = save_attachment(message, attachfile_path)
-                    if not isinstance(a, list):
-                        filename = attachfile_path + file_no(8) + '.pdf'
-                        pdfkit.from_file(a, filename, configuration=pdfconfig)
-                    else:
-                        filename = a[-1]
-                    with open(f'logs/{hosp}_mails.log', 'a') as fp:
-                        print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
-                    if process == 'settlement':
-                        filename = create_settlement_folder(hosp, ins, date, filename)
+                    filename = ""
+                    try:
+                        a = save_attachment(message, attachfile_path)
+                        if not isinstance(a, list):
+                            filename = attachfile_path + file_no(8) + '.pdf'
+                            pdfkit.from_file(a, filename, configuration=pdfconfig)
+                        else:
+                            filename = a[-1]
+                        if process == 'settlement':
+                            filename = create_settlement_folder(hosp, ins, date, filename)
+                    except:
+                        pass
                     with mysql.connector.connect(**conn_data) as con:
                         cur = con.cursor()
                         q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
