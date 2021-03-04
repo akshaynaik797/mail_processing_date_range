@@ -27,7 +27,7 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, timeout
+    hospital_data, timeout, clean_filename
 
 
 class TimeOutException(Exception):
@@ -194,10 +194,10 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                             if 'parts' in msg['payload']:
                                 for j in msg['payload']['parts']:
                                     if 'attachmentId' in j['body']:
-                                        filename = j['filename']
-                                        filename = filename.replace('.PDF', '.pdf')
-                                        filename = attach_path + file_no(4) + filename
-                                        if file_blacklist(filename):
+                                        temp = j['filename']
+                                        if file_blacklist(temp, email=sender):
+                                            filename = clean_filename(temp)
+                                            filename = attach_path + file_no(4) + filename
                                             filename = filename.replace(' ', '')
                                             a_id = j['body']['attachmentId']
                                             attachment = service.users().messages().attachments().get(userId='me', messageId=id,
@@ -447,7 +447,7 @@ def mail_mover(hospital, deferred):
             cur.execute(q, (i['sno'],))
             con.commit()
 
-def mail_storage(hospital, fromtime, totime, deferred):
+def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
     for hosp, data in hospital_data.items():
         if data['mode'] == 'gmail_api' and hosp == hospital:
             print(hosp)

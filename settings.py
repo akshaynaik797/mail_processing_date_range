@@ -72,6 +72,12 @@ for i in hospital_data:
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'
 
+def clean_filename(filename):
+    filename = filename.replace('.PDF', '.pdf')
+    temp = ['/', ' ']
+    for i in temp:
+        filename = filename.replace(i, '')
+    return filename
 
 def file_blacklist(filename, **kwargs):
     fp = filename
@@ -86,8 +92,8 @@ def file_blacklist(filename, **kwargs):
             return False
     if fp.find('ATT00001') != -1:
         return False
-    if (fp.find('MDI') != -1) and (fp.find('Query') == -1):
-        return False
+    # if (fp.find('MDI') != -1) and (fp.find('Query') == -1):
+    #     return False
     if (fp.find('knee') != -1):
         return False
     if (fp.find('KYC') != -1):
