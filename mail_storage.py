@@ -242,7 +242,7 @@ def gmail_api(data, hosp, fromtime, totime, deferred):
                                         pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
                                         flag = 1
                             if process == 'settlement':
-                                create_settlement_folder(hosp, ins, date, filename)
+                                filename = create_settlement_folder(hosp, ins, date, filename)
                             with mysql.connector.connect(**conn_data) as con:
                                 cur = con.cursor()
                                 q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -333,7 +333,7 @@ def graph_api(data, hosp, fromtime, totime, deferred):
                                         attach_path = filename
                                 # print(date, subject, attach_path, sender, sep='|')
                                 if process == 'settlement':
-                                    create_settlement_folder(hosp, ins, date, attach_path)
+                                    attach_path = create_settlement_folder(hosp, ins, date, attach_path)
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
                                     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -405,7 +405,7 @@ def imap_(data, hosp, fromtime, totime, deferred):
                     with open(f'logs/{hosp}_mails.log', 'a') as fp:
                         print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
                     if process == 'settlement':
-                        create_settlement_folder(hosp, ins, date, filename)
+                        filename = create_settlement_folder(hosp, ins, date, filename)
                     with mysql.connector.connect(**conn_data) as con:
                         cur = con.cursor()
                         q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -420,14 +420,21 @@ def imap_(data, hosp, fromtime, totime, deferred):
     except:
         log_exceptions(hosp=hosp)
 
-def mail_mover(hospital, deferred):
+def mail_mover(hospital, deferred, **kwargs):
     fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
-    q = "select * from all_mails where deferred=%s and hospital=%s"
+    q = "select * from all_mails where deferred=%s and hospital=%s "
+    params = [deferred, hospital]
+    if 'process' in kwargs:
+        q = q + ' and process=%s'
+        params.append(kwargs['process'])
+    # if 'insurer' in kwargs:
+    #     q = q + ' and insurer=%s'
+    #     params.append(kwargs['insurer'])
     records = []
     folder = f"../{hospital}/new_attach"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        cur.execute(q, (deferred, hospital,))
+        cur.execute(q, params)
         result = cur.fetchall()
         for i in result:
             temp = {}
@@ -440,14 +447,20 @@ def mail_mover(hospital, deferred):
             dst = os.path.join(folder, os.path.split(i["attach_path"])[-1])
             Path(folder).mkdir(parents=True, exist_ok=True)
             copyfile(i["attach_path"], dst)
-            q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
-            data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
-            cur.execute(q, data)
+            if 'process' in kwargs:
+                if kwargs['process'] == 'settlement':
+                    q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+                    data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(i["attach_path"]), i["completed"], i["sender"], 'date_range', 'settlement', hospital)
+                    cur.execute(q, data)
+            else:
+                q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
+                data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
+                cur.execute(q, data)
             q = "update all_mails set deferred='MOVED' where sno=%s"
             cur.execute(q, (i['sno'],))
             con.commit()
 
-def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
+def mail_storage(hospital, fromtime, totime, deferred):
     for hosp, data in hospital_data.items():
         if data['mode'] == 'gmail_api' and hosp == hospital:
             print(hosp)
