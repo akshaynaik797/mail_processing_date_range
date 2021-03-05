@@ -72,20 +72,6 @@ def get_folders(hospital):
         result = [i[0] for i in records]
     return result
 
-def if_exists(**kwargs):
-    if 'id' in kwargs:
-        q = f"select * from {kwargs['hosp']}_mails where id=%s limit 1"
-        data = (kwargs['id'],)
-    elif 'subject' in kwargs and 'date' in kwargs:
-        q = f"select * from {kwargs['hosp']}_mails where subject=%s and date=%s limit 1"
-        data = (kwargs['subject'], kwargs['date'])
-    with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
-        cur.execute(q, data)
-        result = cur.fetchone()
-        if result is None:
-            return False
-    return True
 
 def gmail_api(data, hosp, fromtime, totime, deferred):
     try:

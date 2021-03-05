@@ -3,14 +3,15 @@ import re
 from datetime import datetime
 from random import randint
 
+import mysql.connector
 import pdfkit
 from pathlib import Path
 from dateutil.parser import parse
 from pytz import timezone
 
-timeout = 60 #seconds
-mail_time = 15 #minutes
-interval = 300 #seconds
+timeout = 60 # seconds
+mail_time = 15  # minutes
+interval = 300  # seconds
 conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
              'user': "admin",
              'password': "Welcome1!",
@@ -72,6 +73,7 @@ for i in hospital_data:
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'
 
+
 def clean_filename(filename):
     filename = filename.replace('.PDF', '.pdf')
     temp = ['/', ' ']
@@ -79,10 +81,11 @@ def clean_filename(filename):
         filename = filename.replace(i, '')
     return filename
 
+
 def file_blacklist(filename, **kwargs):
     fp = filename
     filename, file_extension = os.path.splitext(fp)
-    ext = ['.pdf', '.htm', '.html', '.PDF']
+    ext = ['.pdf', '.htm', '.html', '.PDF', '.xlsx']
     if file_extension not in ext:
         return False
     if 'email' in kwargs:
@@ -111,6 +114,7 @@ def file_blacklist(filename, **kwargs):
     if (fp.find('declar') != -1):
         return False
     return True
+
 
 def remove_img_tags(data):
     p = re.compile(r'<img.*?>')
@@ -186,3 +190,25 @@ def save_attachment(msg, download_folder):
                 att_path = os.path.join(download_folder, filename)
                 pass
     return att_path
+
+def if_exists(**kwargs):
+    q = f"select * from all_mails where subject=%s and date=%s and id=%s and attach_path != '' limit 1"
+    data = (kwargs['subject'], kwargs['date'], kwargs['id'])
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, data)
+        result = cur.fetchone()
+        if result is not None:
+            return True
+    return False
+
+def check_blank_attach(**kwargs):
+    q = f"select * from all_mails where subject=%s and date=%s and id=%s and attach_path='' limit 1"
+    data = (kwargs['subject'], kwargs['date'], kwargs['id'])
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, data)
+        result = cur.fetchone()
+        if result is not None:
+            return True
+    return False
