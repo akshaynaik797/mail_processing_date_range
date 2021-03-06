@@ -1,4 +1,7 @@
-import os
+from time import sleep
 
-a = os.path.exists(os.path.abspath('aa.txt'))
-pass
+from mail_storage import settlement_mail_mover
+
+while 1:
+    settlement_mail_mover('X')
+    sleep(60)

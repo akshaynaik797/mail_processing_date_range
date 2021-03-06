@@ -1,19 +1,15 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from settings import hospital_data, pdfconfig, file_no, file_blacklist, conn_data, interval
-from mail_storage import gmail_api, graph_api, imap_
+from mail_storage import mail_mover, mail_storage, settlement_mail_mover
 
-sched = BackgroundScheduler(daemon=False)
-for hosp, data in hospital_data.items():
-    if data['mode'] == 'gmail_api':
-        # print(hosp)
-        # gmail_api(data, hosp)
-        sched.add_job(gmail_api, 'interval', seconds=interval, args=[data, hosp], max_instances=1)
-    elif data['mode'] == 'graph_api':
-        # print(hosp)
-        # graph_api(data, hosp)
-        sched.add_job(graph_api, 'interval', seconds=interval, args=[data, hosp], max_instances=1)
-    elif data['mode'] == 'imap_':
-        # imap_(data, hosp)
-        sched.add_job(imap_, 'interval', seconds=interval, args=[data, hosp], max_instances=1)
-sched.start()
-print('Scheduler running')
+
+def process_mails_in_range(hospital, fromtime, totime, deferred, **kwargs):
+    #if deffred is X then read historical
+    mail_storage(hospital, fromtime, totime, deferred, **kwargs)
+    if deferred != 'X':
+        mail_mover(hospital, deferred)
+    if 'process' in kwargs:
+        if kwargs['process'] == 'settlement':
+            settlement_mail_mover(deferred)
+
+if __name__ == '__main__':
+    for i in ['ils', 'ils_dumdum', 'inamdar', 'ils_agartala', 'ils_howrah', 'noble']:
+        process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')

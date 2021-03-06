@@ -85,7 +85,7 @@ def clean_filename(filename):
 def file_blacklist(filename, **kwargs):
     fp = filename
     filename, file_extension = os.path.splitext(fp)
-    ext = ['.pdf', '.htm', '.html', '.PDF', '.xlsx']
+    ext = ['.pdf', '.htm', '.html', '.PDF', '.xlsx', '.xls']
     if file_extension not in ext:
         return False
     if 'email' in kwargs:
@@ -191,7 +191,7 @@ def save_attachment(msg, download_folder):
                 pass
     return att_path
 
-def if_exists(**kwargs):
+def if_exists_not_blank_attach(**kwargs):
     q = f"select * from all_mails where subject=%s and date=%s and id=%s and attach_path != '' limit 1"
     data = (kwargs['subject'], kwargs['date'], kwargs['id'])
     with mysql.connector.connect(**conn_data) as con:
@@ -201,6 +201,18 @@ def if_exists(**kwargs):
         if result is not None:
             return True
     return False
+
+def if_exists(**kwargs):
+    q = f"select * from all_mails where subject=%s and date=%s and id=%s limit 1"
+    data = (kwargs['subject'], kwargs['date'], kwargs['id'])
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q, data)
+        result = cur.fetchone()
+        if result is not None:
+            return True
+    return False
+
 
 def check_blank_attach(**kwargs):
     q = f"select * from all_mails where subject=%s and date=%s and id=%s and attach_path='' limit 1"
