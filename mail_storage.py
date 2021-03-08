@@ -325,6 +325,7 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                     else:
                                         download_attach = False
                                 if download_attach == True:
+                                    flag = 0
                                     try:
                                         if i['hasAttachments'] is True:
                                             q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/inbox/messages/{i['id']}/attachments"
@@ -335,12 +336,13 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                                 if '@odata.mediaContentType' in j:
                                                     j['name'] = j['name'].replace('.PDF', '.pdf')
                                                     # print(j['@odata.mediaContentType'], j['name'])
-                                                    if file_blacklist(j['name']):
+                                                    if file_blacklist(j['name'], email=sender):
                                                         j['name'] = file_no(4) + j['name']
                                                         with open(os.path.join(attachfile_path, j['name']), 'w+b') as fp:
                                                             fp.write(base64.b64decode(j['contentBytes']))
                                                         attach_path = os.path.join(attachfile_path, j['name'])
-                                        else:
+                                                        flag = 1
+                                        if flag == 0:
                                             filename = attachfile_path + file_no(8) + '.pdf'
                                             if i['body']['contentType'] == 'html':
                                                 with open(attachfile_path + 'temp.html', 'w') as fp:
@@ -438,7 +440,7 @@ def imap_(data, hosp, fromtime, totime, deferred, **kwargs):
                             download_attach = False
                     if download_attach == True:
                         try:
-                            a = save_attachment(message, attachfile_path)
+                            a = save_attachment(message, attachfile_path, email=sender)
                             if not isinstance(a, list):
                                 filename = attachfile_path + file_no(8) + '.pdf'
                                 pdfkit.from_file(a, filename, configuration=pdfconfig)

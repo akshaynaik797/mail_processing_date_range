@@ -141,7 +141,7 @@ def format_date(date):
     return date
 
 
-def save_attachment(msg, download_folder):
+def save_attachment(msg, download_folder, **kwargs):
     """
     Given a message, save its attachments to the specified
     download folder (default is /tmp)
@@ -161,7 +161,7 @@ def save_attachment(msg, download_folder):
             continue
         flag = 1
         filename = part.get_filename()
-        if filename is not None and file_blacklist(filename):
+        if filename is not None and file_blacklist(filename, **kwargs):
             if not os.path.isfile(filename):
                 fp = open(os.path.join(download_folder, file_seq + filename), 'wb')
                 fp.write(part.get_payload(decode=True))
