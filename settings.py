@@ -48,6 +48,13 @@ hospital_data = {
             "email": 'mediclaim.ils.dumdum@gptgroup.co.in'
         }
     },
+    'ils_ho': {
+        "mode": "graph_api",
+        "data": {
+            "json_file": "data/credentials_ils.json",
+            "email": 'rgupta@gptgroup.co.in'
+        }
+    },
     'ils_agartala': {
         "mode": "imap_",
         "data": {
@@ -73,6 +80,18 @@ for i in hospital_data:
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'
 
+def gen_dict_extract(key, var):
+    if isinstance(var,(list, tuple, dict)):
+        for k, v in var.items():
+            if k == key:
+                yield v
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d):
+                        yield result
 
 def clean_filename(filename):
     filename = filename.replace('.PDF', '.pdf')
@@ -203,6 +222,9 @@ def if_exists_not_blank_attach(**kwargs):
     return False
 
 def if_exists(**kwargs):
+    for i in kwargs:
+        if kwargs[i] is None:
+            return True
     q = f"select * from all_mails where subject=%s and date=%s and id=%s limit 1"
     data = (kwargs['subject'], kwargs['date'], kwargs['id'])
     with mysql.connector.connect(**conn_data) as con:

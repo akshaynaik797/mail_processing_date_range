@@ -332,7 +332,7 @@ def graph_api(data, hosp, mail_id, deferred, **kwargs):
                                 attach_path = create_settlement_folder(hosp, ins, date, attach_path)
                             attach_path = os.path.abspath(attach_path)
                         except:
-                            pass
+                            log_exceptions()
                     if check_blank_attach(subject=subject, date=date, id=i['id']):
                         q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
                         data = (attach_path, subject, date, i['id'])
@@ -546,4 +546,5 @@ def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
             imap_(data, hosp, fromtime, totime, deferred, **kwargs)
 
 if __name__ == '__main__':
-    imap_(hospital_data['ils_agartala'], 'ils_agartala', 'Payment Advice-BCS_ECS9522021020320100059_1898_952', '')
+    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEJAACae-7OrA5zRZFYI_1LZwhRAALD-gpiAAA='
+    graph_api(hospital_data['ils_ho'], 'ils_ho', mid, '')

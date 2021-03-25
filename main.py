@@ -11,5 +11,7 @@ def process_mails_in_range(hospital, fromtime, totime, deferred, **kwargs):
             settlement_mail_mover(deferred)
 
 if __name__ == '__main__':
-    for i in ['ils', 'ils_dumdum', 'inamdar', 'ils_agartala', 'ils_howrah', 'noble']:
-        process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')
+    # for i in ['ils', 'ils_dumdum', 'inamdar', 'ils_agartala', 'ils_howrah', 'noble']:
+    #     process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')
+    for i in ['ils_dumdum']:
+        process_mails_in_range(i, "24/03/2021 16:57:30", "24/03/2021 16:57:50", "")
