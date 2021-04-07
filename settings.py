@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from datetime import datetime
 from random import randint
 
@@ -237,12 +238,20 @@ def if_exists(**kwargs):
 
 
 def check_blank_attach(**kwargs):
-    q = f"select * from all_mails where subject=%s and date=%s and id=%s and attach_path='' limit 1"
+    q = f"select attach_path from all_mails where subject=%s and date=%s and id=%s limit 1"
     data = (kwargs['subject'], kwargs['date'], kwargs['id'])
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q, data)
         result = cur.fetchone()
         if result is not None:
-            return True
+            if not ls_cmd(result[0]):
+                return True
+    return False
+
+def ls_cmd(filename):
+    temp = subprocess.Popen(['ls', filename], stdout=subprocess.PIPE)
+    output = temp.communicate()
+    if len(output[0]) != 0:
+        return True
     return False

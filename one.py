@@ -27,7 +27,7 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists
+    hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd
 
 
 class TimeOutException(Exception):
@@ -497,13 +497,13 @@ def mail_mover(hospital, deferred, **kwargs):
             con.commit()
 
 
-def settlement_mail_mover():
+def settlement_mail_mover(deferred):
     fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
-    q = "select * from all_mails where and  process='settlement' and deferred=''"
+    q = "select * from all_mails where process='settlement' and deferred=%s and attach_path != ''"
     records = []
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
-        cur.execute(q)
+        cur.execute(q, (deferred,))
         result = cur.fetchall()
         for i in result:
             temp = {}
@@ -513,18 +513,31 @@ def settlement_mail_mover():
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         for i in records:
-            cur.execute('select * from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
-            temp_r = cur.fetchone()
-            if temp_r is None or os.path.exists(os.path.abspath(i["attach_path"])) is False:
-                q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
-                data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(i["attach_path"]), i["completed"], i["sender"], 'date_range', 'settlement', i["hospital"])
-                cur.execute(q, data)
-                q = "update all_mails set deferred='MOVED' where sno=%s"
-                cur.execute(q, (i['sno'],))
-            else:
-                q = "update all_mails set deferred='EXISTS' where sno=%s"
-                cur.execute(q, (i['sno'],))
-            con.commit()
+            try:
+                cur.execute('select * from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
+                temp_r = cur.fetchone()
+                if temp_r is None:
+                    q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+                    data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(i["attach_path"]), i["completed"], i["sender"], 'date_range', 'settlement', i['hospital'])
+                    cur.execute(q, data)
+                    q = "update all_mails set deferred='MOVED' where sno=%s"
+                    cur.execute(q, (i['sno'],))
+                else:
+                    cur.execute('select attach_path from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
+                    temp_r = cur.fetchone()
+                    if temp_r is not None:
+                        if not ls_cmd(temp_r[0]):
+                            q = "update settlement_mails set attach_path=%s where `id`=%s and `subject`=%s and `date`=%s"
+                            data = (i["attach_path"], i["id"], i["subject"], i["date"])
+                            cur.execute(q, data)
+                            q = "update all_mails set deferred='FIXED_ATTACH' where sno=%s"
+                            cur.execute(q, (i['sno'],))
+                    else:
+                        q = "update all_mails set deferred='EXISTS' where sno=%s"
+                        cur.execute(q, (i['sno'],))
+                con.commit()
+            except:
+                log_exceptions(i=i)
 
 
 def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
