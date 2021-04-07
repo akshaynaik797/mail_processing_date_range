@@ -24,7 +24,7 @@ from googleapiclient.discovery import build
 from pytz import timezone
 from email.header import decode_header
 
-
+from common import settlement_mail_mover
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
     hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd
@@ -496,68 +496,29 @@ def mail_mover(hospital, deferred, **kwargs):
                 cur.execute(q, (i['sno'],))
             con.commit()
 
-
-def settlement_mail_mover(deferred):
-    fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
-    q = "select * from all_mails where process='settlement' and deferred=%s and attach_path != ''"
-    records = []
-    with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
-        cur.execute(q, (deferred,))
-        result = cur.fetchall()
-        for i in result:
-            temp = {}
-            for key, value in zip(fields, i):
-                temp[key] = value
-            records.append(temp)
-    with mysql.connector.connect(**conn_data) as con:
-        cur = con.cursor()
-        for i in records:
-            try:
-                cur.execute('select * from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
-                temp_r = cur.fetchone()
-                if temp_r is None:
-                    q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
-                    data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(i["attach_path"]), i["completed"], i["sender"], 'date_range', 'settlement', i['hospital'])
-                    cur.execute(q, data)
-                    q = "update all_mails set deferred='MOVED' where sno=%s"
-                    cur.execute(q, (i['sno'],))
-                else:
-                    cur.execute('select attach_path from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
-                    temp_r = cur.fetchone()
-                    if temp_r is not None:
-                        if not ls_cmd(temp_r[0]):
-                            q = "update settlement_mails set attach_path=%s where `id`=%s and `subject`=%s and `date`=%s"
-                            data = (i["attach_path"], i["id"], i["subject"], i["date"])
-                            cur.execute(q, data)
-                            q = "update all_mails set deferred='FIXED_ATTACH' where sno=%s"
-                            cur.execute(q, (i['sno'],))
-                    else:
-                        q = "update all_mails set deferred='EXISTS' where sno=%s"
-                        cur.execute(q, (i['sno'],))
-                con.commit()
-            except:
-                log_exceptions(i=i)
-
-
-def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
+def mail_storage(hospital, value, deferred, **kwargs):
+    mail_id, subject = value, value
     for hosp, data in hospital_data.items():
         if data['mode'] == 'gmail_api' and hosp == hospital:
-            print(hosp)
-            fromtime = int(datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').timestamp())
-            totime = int(datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').timestamp())
-            gmail_api(data, hosp, fromtime, totime, deferred, **kwargs)
+            gmail_api(data, hosp, mail_id, deferred, **kwargs)
         elif data['mode'] == 'graph_api' and hosp == hospital:
-            print(hosp) #.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            fromtime = datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            totime = datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            graph_api(data, hosp, fromtime, totime, deferred, **kwargs)
+            graph_api(data, hosp, mail_id, deferred, **kwargs)
         elif data['mode'] == 'imap_' and hosp == hospital:
-            print(hosp)
-            fromtime = datetime.strptime(fromtime, '%d/%m/%Y %H:%M:%S').strftime('%d-%b-%Y')
-            totime = datetime.strptime(totime, '%d/%m/%Y %H:%M:%S').strftime('%d-%b-%Y')
-            imap_(data, hosp, fromtime, totime, deferred, **kwargs)
+            imap_(data, hosp, subject, deferred, **kwargs)
 
 if __name__ == '__main__':
-    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEJAACae-7OrA5zRZFYI_1LZwhRAALD-gpiAAA='
-    graph_api(hospital_data['ils_ho'], 'ils_ho', mid, '')
+    deferred = ""
+
+    # mid = '17749ebab074a130'
+    # hospital = 'noble'
+    # mail_storage(hospital, mid, deferred)
+    # settlement_mail_mover(deferred, id=mid)
+
+    q = "select hospital, id from settlement_mails where completed='NO_ATTACH'"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q)
+        result = cur.fetchall()
+    for hospital, mid in result:
+        mail_storage(hospital, mid, deferred)
+        settlement_mail_mover(deferred, id=mid)

@@ -250,8 +250,6 @@ def check_blank_attach(**kwargs):
     return False
 
 def ls_cmd(filename):
-    temp = subprocess.Popen(['ls', filename], stdout=subprocess.PIPE)
-    output = temp.communicate()
-    if len(output[0]) != 0:
+    if os.path.exists(filename) and filename != "":
         return True
     return False
