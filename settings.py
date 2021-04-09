@@ -77,22 +77,25 @@ hospital_data = {
 for i in hospital_data:
     Path(os.path.join(i, "new_attach/")).mkdir(parents=True, exist_ok=True)
 
+def remove_img_tags(data):
+    p = re.compile(r'<img.*?/>')
+    return p.sub('', data)
+
+def html_to_pdf(src, dst):
+    with open(src, 'r') as fp:
+        data = fp.read()
+    data = remove_img_tags(data)
+    pdfkit.from_string(data, dst, configuration=pdfconfig)
 
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'
 
-def gen_dict_extract(key, var):
-    if isinstance(var,(list, tuple, dict)):
-        for k, v in var.items():
-            if k == key:
-                yield v
-            if isinstance(v, dict):
-                for result in gen_dict_extract(key, v):
-                    yield result
-            elif isinstance(v, list):
-                for d in v:
-                    for result in gen_dict_extract(key, d):
-                        yield result
+def get_parts(part):
+    if 'parts' in part:
+        for i in part['parts']:
+            yield from get_parts(i)
+    else:
+        yield part
 
 def clean_filename(filename):
     filename = filename.replace('.PDF', '.pdf')

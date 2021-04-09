@@ -27,7 +27,8 @@ from email.header import decode_header
 
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
-    hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd
+    hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd, \
+    get_parts, html_to_pdf
 
 
 class TimeOutException(Exception):
@@ -183,70 +184,53 @@ def gmail_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                     download_attach = False
                             if download_attach == True:
                                 try:
-                                    if 'parts' in msg['payload']:
-                                        for j in msg['payload']['parts']:
-                                            if 'attachmentId' in j['body']:
-                                                temp = j['filename']
-                                                if file_blacklist(temp, email=sender):
-                                                    filename = clean_filename(temp)
-                                                    filename = attach_path + file_no(4) + filename
-                                                    filename = filename.replace(' ', '')
-                                                    a_id = j['body']['attachmentId']
-                                                    attachment = service.users().messages().attachments().get(userId='me', messageId=id,
-                                                                                                              id=a_id).execute()
-                                                    data = attachment['data']
-                                                    with open(filename, 'wb') as fp:
-                                                        fp.write(base64.urlsafe_b64decode(data))
-                                                    print(filename)
-                                                    flag = 1
-                                    else:
-                                        data = msg['payload']['body']['data']
-                                        filename = attach_path + file_no(8) + '.pdf'
-                                        with open(attach_path + 'temp.html', 'wb') as fp:
-                                            fp.write(base64.urlsafe_b64decode(data))
-                                        print(filename)
-                                        pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
-                                        flag = 1
-                                    if flag == 0:
-                                        if 'data' in msg['payload']['parts'][0]['body']:
-                                            data = msg['payload']['parts'][0]['parts'][-1]['body']['data']
-                                            filename = attach_path + file_no(8) + '.pdf'
-                                            with open(attach_path + 'temp.html', 'wb') as fp:
-                                                fp.write(base64.urlsafe_b64decode(data))
-                                            print(filename)
-                                            pdfkit.from_file(attach_path + 'temp.html', filename,
-                                                             configuration=pdfconfig)
-                                            flag = 1
-                                        elif 'data' in msg['payload']['parts'][-1]['body']:
-                                            data = msg['payload']['parts'][-1]['body']['data']
-                                            filename = attach_path + file_no(8) + '.pdf'
-                                            with open(attach_path + 'temp.html', 'wb') as fp:
-                                                fp.write(base64.urlsafe_b64decode(data))
-                                            print(filename)
-                                            pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
-                                            flag = 1
-                                        else:
-                                            if 'data' in msg['payload']['parts'][0]['parts'][-1]['body']:
-                                                data = msg['payload']['parts'][0]['parts'][-1]['body']['data']
-                                                filename = attach_path + file_no(8) + '.pdf'
-                                                with open(attach_path + 'temp.html', 'wb') as fp:
+                                    flag, file_list = 0, [i for i in get_parts(msg['payload'])]
+                                    for j in file_list:
+                                        if j['filename'] != '' and 'attachmentId' in j['body']:
+                                            temp = j['filename']
+                                            if file_blacklist(temp, email=sender):
+                                                filename = clean_filename(temp)
+                                                filename = attach_path + file_no(4) + filename
+                                                filename = filename.replace(' ', '')
+                                                a_id = j['body']['attachmentId']
+                                                attachment = service.users().messages().attachments().get(userId='me',
+                                                                                                          messageId=id,
+                                                                                                          id=a_id).execute()
+                                                data = attachment['data']
+                                                with open(filename, 'wb') as fp:
                                                     fp.write(base64.urlsafe_b64decode(data))
                                                 print(filename)
-                                                pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
                                                 flag = 1
-                                            else:
-                                                data = msg['payload']['parts'][0]['parts'][-1]['parts'][-1]['body']['data']
+                                    try:
+                                        for j in file_list:
+                                            if flag == 0 and j['filename'] == '' and j['mimeType'] == 'text/html':
+                                                data = j['body']['data']
                                                 filename = attach_path + file_no(8) + '.pdf'
                                                 with open(attach_path + 'temp.html', 'wb') as fp:
                                                     fp.write(base64.urlsafe_b64decode(data))
                                                 print(filename)
-                                                pdfkit.from_file(attach_path + 'temp.html', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attach_path + 'temp.html', filename,
+                                                #                  configuration=pdfconfig)
+                                                html_to_pdf(attach_path + 'temp.html', filename)
+                                                flag = 1
+                                    except:
+                                        log_exceptions(id=id, hosp=hosp)
+                                    finally:
+                                        for j in file_list:
+                                            if flag == 0 and j['filename'] == '' and j['mimeType'] == 'text/plain':
+                                                data = j['body']['data']
+                                                filename = attach_path + file_no(8) + '.pdf'
+                                                with open(attach_path + 'temp.txt', 'wb') as fp:
+                                                    fp.write(base64.urlsafe_b64decode(data))
+                                                print(filename)
+                                                pdfkit.from_file(attach_path + 'temp.txt', filename,
+                                                                 configuration=pdfconfig)
                                                 flag = 1
                                     if process == 'settlement':
                                         filename = create_settlement_folder(hosp, ins, date, filename)
                                     filename = os.path.abspath(filename)
                                 except:
-                                    pass
+                                    log_exceptions(id=id, hosp=hosp)
                             if check_blank_attach(subject=subject, date=date, id=id):
                                 q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
                                 data = (filename, subject, date, id)
