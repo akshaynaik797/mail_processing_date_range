@@ -132,7 +132,7 @@ def gmail_api(data, hosp, fromtime, totime, deferred, **kwargs):
                     #print("No messages found.")
                 else:
                     print("Message snippets:")
-                    for message in messages[::-1]:
+                    for message in messages:
                         signal.signal(signal.SIGALRM, alarm_handler)
                         signal.alarm(timeout)
                         try:
@@ -232,8 +232,8 @@ def gmail_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                 except:
                                     log_exceptions(id=id, hosp=hosp)
                             if check_blank_attach(subject=subject, date=date, id=id):
-                                q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
-                                data = (filename, subject, date, id)
+                                q = "update all_mails set attach_path=%s, deferred=%s, process=%s, insurer=%s where subject=%s and date=%s and id=%s"
+                                data = (filename, deferred, process, ins, subject, date, id)
                             if not if_exists(subject=subject, date=date, id=id):
                                 q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                                 data = (id, subject, date, str(datetime.now()), filename, '', sender, hosp, ins, process, deferred, folder)
@@ -331,12 +331,14 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                             if i['body']['contentType'] == 'html':
                                                 with open(attachfile_path + 'temp.html', 'w') as fp:
                                                     fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                                html_to_pdf(attachfile_path + 'temp.html', filename)
                                                 attach_path = filename
                                             elif i['body']['contentType'] == 'text':
                                                 with open(attachfile_path + 'temp.text', 'w') as fp:
                                                     fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                                # pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                                html_to_pdf(attachfile_path + 'temp.txt', filename)
                                                 attach_path = filename
                                         # print(date, subject, attach_path, sender, sep='|')
                                         if process == 'settlement':
@@ -345,13 +347,15 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                     except:
                                         pass
                                 if check_blank_attach(subject=subject, date=date, id=i['id']):
-                                    q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
-                                    data = (attach_path, subject, date, i['id'])
+                                    q = "update all_mails set attach_path=%s, deferred=%s, process=%s, insurer=%s where subject=%s and date=%s and id=%s"
+                                    data = (attach_path, deferred, process, ins, subject, date, i['id'])
+                                    print('updated ', i['id'])
                                 if not if_exists(subject=subject, date=date, id=i['id']):
                                     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                                     data = (
                                     i['id'], subject, date, str(datetime.now()), attach_path, '', sender, hosp, ins, process,
                                     deferred, folder)
+                                    print('inserted ', i['id'])
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
                                     cur.execute(q, data)
@@ -427,7 +431,9 @@ def imap_(data, hosp, fromtime, totime, deferred, **kwargs):
                             a = save_attachment(message, attachfile_path, email=sender)
                             if not isinstance(a, list):
                                 filename = attachfile_path + file_no(8) + '.pdf'
-                                pdfkit.from_file(a, filename, configuration=pdfconfig)
+                                # pdfkit.from_file(a, filename, configuration=pdfconfig)
+                                html_to_pdf(a, filename)
+
                             else:
                                 filename = a[-1]
                             if process == 'settlement':
@@ -436,8 +442,8 @@ def imap_(data, hosp, fromtime, totime, deferred, **kwargs):
                         except:
                             pass
                     if check_blank_attach(subject=subject, date=date, id=mid):
-                        q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
-                        data = (filename, subject, date, mid)
+                        q = "update all_mails set attach_path=%s, deferred=%s, process=%s, insurer=%s where subject=%s and date=%s and id=%s"
+                        data = (filename, deferred, process, ins, subject, date, mid)
                     if not if_exists(subject=subject, date=date, id=mid):
                         q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                         data = (
@@ -485,34 +491,27 @@ def mail_mover(hospital, deferred):
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         for i in records:
-            dst = os.path.join(folder, os.path.split(i["attach_path"])[-1])
-            Path(folder).mkdir(parents=True, exist_ok=True)
-            copyfile(i["attach_path"], dst)
-            # if 'process' in kwargs:
-            #     if kwargs['process'] == 'settlement':
-            #         cur.execute('select * from settlement_mails where `id`=%s and `subject`=%s and `date`=%s limit 1', (i["id"], i["subject"], i["date"]))
-            #         temp_r = cur.fetchone()
-            #         if temp_r is None or os.path.exists(os.path.abspath(i["attach_path"])) is False:
-            #             q = 'INSERT INTO settlement_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`folder`,`process`,`hospital`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
-            #             data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(i["attach_path"]), i["completed"], i["sender"], 'date_range', 'settlement', hospital)
-            #             cur.execute(q, data)
-            # else:
-            #     q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
-            #     data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
-            #     cur.execute(q, data)
-            cur.execute(f'select * from {hospital}_mails where `id`=%s and `subject`=%s and `date`=%s limit 1',
-                        (i["id"], i["subject"], i["date"]))
-            temp_r = cur.fetchone()
-            if temp_r is None:
-                q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
-                data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
-                cur.execute(q, data)
-                q = "update all_mails set deferred='MOVED' where sno=%s"
-                cur.execute(q, (i['sno'],))
-            else:
-                q = "update all_mails set deferred='EXISTS' where sno=%s"
-                cur.execute(q, (i['sno'],))
-            con.commit()
+            try:
+                if i["attach_path"] == '' and os.path.isfile(i["attach_path"]) is False:
+                    continue
+                dst = os.path.join(folder, os.path.split(i["attach_path"])[-1])
+                Path(folder).mkdir(parents=True, exist_ok=True)
+                copyfile(i["attach_path"], dst)
+                cur.execute(f'select * from {hospital}_mails where `id`=%s and `subject`=%s and `date`=%s limit 1',
+                            (i["id"], i["subject"], i["date"]))
+                temp_r = cur.fetchone()
+                if temp_r is None:
+                    q = f"INSERT INTO {hospital}_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`) values (%s, %s, %s, %s, %s, %s, %s)"
+                    data = (i["id"], i["subject"], i["date"], str(datetime.now()), os.path.abspath(dst), i["completed"], i["sender"])
+                    cur.execute(q, data)
+                    q = "update all_mails set deferred='MOVED' where sno=%s"
+                    cur.execute(q, (i['sno'],))
+                else:
+                    q = "update all_mails set deferred='EXISTS' where sno=%s"
+                    cur.execute(q, (i['sno'],))
+                con.commit()
+            except:
+                log_exceptions(record=i)
 
 def mail_storage(hospital, fromtime, totime, deferred, **kwargs):
     for hosp, data in hospital_data.items():

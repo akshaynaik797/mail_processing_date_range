@@ -1,21 +1,8 @@
-import re
+from settings import check_blank_attach, ls_cmd
 
-import pdfkit
-import weasyprint
-
-from settings import pdfconfig
-
-html_file = '/home/akshay/Downloads/temp.html'
-pdf_file = '/home/akshay/Downloads/1.pdf'
-
-def remove_img_tags(data):
-    p = re.compile(r'<img.*?/>')
-    return p.sub('', data)
-
-if __name__ == '__main__':
-    with open(html_file, 'r') as fp:
-        data = fp.read()
-    data = remove_img_tags(data)
-    pdfkit.from_string(data, pdf_file, configuration=pdfconfig)
-
-
+a = ls_cmd('')
+subject = "Insured Name : SIEGWERK INDIA PRIVATE LTD Policy No : OG-21-1113-8403-00000103 ID Card No : GMC-21111330103-E669D Ptn Name : AMIYA KUMAR MUKHERJEE Claim ID : 4501162 Cashless Claim Covering Letter"
+date = "02/03/2021 19:09:02"
+id = "AAMkAGMxMzcwMjVlLThjYjYtNGJlOC1iOWQzLTUzZjg5MTEwOTJiZABGAAAAAABg8S9egpbpQom_SYSQFJTABwA80npqDluGRIdxtgeTfSBNAAAAAAEMAAA80npqDluGRIdxtgeTfSBNAALHEjwQAAA="
+a = check_blank_attach(subject=subject, date=date, id=id)
+pass

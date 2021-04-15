@@ -1,17 +1,20 @@
-from mail_storage import mail_mover, mail_storage, settlement_mail_mover
+from common import settlement_mail_mover
+from mail_storage import mail_mover, mail_storage
 
 
-def process_mails_in_range(hospital, fromtime, totime, deferred, **kwargs):
+def process_mails_in_range(hospitals, fromtime, totime, deferred, **kwargs):
     #if deffred is X then read historical
-    mail_storage(hospital, fromtime, totime, deferred, **kwargs)
-    if deferred != 'X':
-        mail_mover(hospital, deferred)
-    if 'process' in kwargs:
-        if kwargs['process'] == 'settlement':
-            settlement_mail_mover(deferred)
+    for hospital in hospitals:
+        mail_storage(hospital, fromtime, totime, deferred, **kwargs)
+        if 'process' in kwargs:
+            if kwargs['process'] == 'settlement':
+                settlement_mail_mover(deferred)
+        if deferred != 'X':
+            mail_mover(hospital, deferred)
 
 if __name__ == '__main__':
     # for i in ['ils', 'ils_dumdum', 'inamdar', 'ils_agartala', 'ils_howrah', 'noble']:
     #     process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')
-    for i in ['ils_dumdum']:
-        process_mails_in_range(i, "24/03/2021 16:57:30", "24/03/2021 16:57:50", "")
+    hospitals = ['ils', 'ils_dumdum', 'ils_agartala', 'ils_howrah', 'ils_ho']
+    hospitals = ['ils_ho']
+    process_mails_in_range(hospitals, "02/02/2021 21:01:00", "01/03/2021 23:59:00", "X", process='settlement')

@@ -478,8 +478,7 @@ def mail_mover(hospital, deferred, **kwargs):
                 cur.execute(q, (i['sno'],))
             con.commit()
 
-def mail_storage(hospital, value, deferred, **kwargs):
-    mail_id, subject = value, value
+def mail_storage(hospital, mail_id, subject, deferred, **kwargs):
     for hosp, data in hospital_data.items():
         if data['mode'] == 'gmail_api' and hosp == hospital:
             gmail_api(data, hosp, mail_id, deferred, **kwargs)
@@ -490,22 +489,22 @@ def mail_storage(hospital, value, deferred, **kwargs):
 
 if __name__ == '__main__':
     deferred = ""
-    mid = '17305d0a6be7ed56'
+    mid = '1787245182b0311b'
     hospital = 'noble'
-    mail_storage(hospital, mid, deferred)
-    settlement_mail_mover(deferred, id=mid)
+    # mail_storage(hospital, mid, deferred)
+    # settlement_mail_mover(deferred, id=mid)
 
     # q = "select hospital, id from settlement_mails where completed='NO_ATTACH'"
-    # q = "SELECT hospital, id from settlement_mails where sender = 'ihealthcare@icicilombard.com' and completed = 'p';"
-    # with mysql.connector.connect(**conn_data) as con:
-    #     cur = con.cursor()
-    #     cur.execute(q)
-    #     result = cur.fetchall()
-    # for hospital, mid in result:
-    #     mail_storage(hospital, mid, deferred)
-    #     settlement_mail_mover(deferred, id=mid)
-    #     with mysql.connector.connect(**conn_data) as con:
-    #         cur = con.cursor()
-    #         q = "update settlement_mails set completed='' where id=%s"
-    #         cur.execute(q, (mid,))
-    #         con.commit()
+    q = "SELECT hospital, id, subject FROM python.settlement_mails where attach_path = '';"
+    with mysql.connector.connect(**conn_data) as con:
+        cur = con.cursor()
+        cur.execute(q)
+        result = cur.fetchall()
+    for hospital, mid, subject in result:
+        mail_storage(hospital, mid, subject, deferred)
+        settlement_mail_mover(deferred, id=mid)
+        with mysql.connector.connect(**conn_data) as con:
+            cur = con.cursor()
+            q = "update settlement_mails set completed='' where id=%s"
+            cur.execute(q, (mid,))
+            con.commit()
