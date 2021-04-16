@@ -24,7 +24,7 @@ from googleapiclient.discovery import build
 from pytz import timezone
 from email.header import decode_header
 
-
+from common import get_utr_date_from_big
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
     hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd, \
@@ -167,9 +167,11 @@ def gmail_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                     with open(f'logs/{hosp}_fail_mails.log', 'a') as fp:
                                         print(id, subject, date, sep=',', file=fp)
                                     continue
+                            ins, process = get_ins_process(subject, sender)
+                            if ins == 'big' and process == "settlement":
+                                get_utr_date_from_big(msg, mode='gmail_api', id=id, hosp=hosp)
                             if if_exists_not_blank_attach(subject=subject, date=date, id=id):
                                 continue                                
-                            ins, process = get_ins_process(subject, sender)
                             flag = 0
                             filename, download_attach = "", True
                             if 'process' in kwargs:
@@ -295,6 +297,8 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                 b = b.strftime('%d/%m/%Y %H:%M:%S')
                                 date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
                                 ins, process = get_ins_process(subject, sender)
+                                if ins == 'big' and process == "settlement":
+                                    get_utr_date_from_big(i, mode='graph_api', id=i['id'], hosp=hosp)
                                 attach_path, download_attach = "", True
                                 if if_exists_not_blank_attach(subject=subject, date=date, id=i['id']):
                                     continue
@@ -349,13 +353,11 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                 if check_blank_attach(subject=subject, date=date, id=i['id']):
                                     q = "update all_mails set attach_path=%s, deferred=%s, process=%s, insurer=%s where subject=%s and date=%s and id=%s"
                                     data = (attach_path, deferred, process, ins, subject, date, i['id'])
-                                    print('updated ', i['id'])
                                 if not if_exists(subject=subject, date=date, id=i['id']):
                                     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                                     data = (
                                     i['id'], subject, date, str(datetime.now()), attach_path, '', sender, hosp, ins, process,
                                     deferred, folder)
-                                    print('inserted ', i['id'])
                                 with mysql.connector.connect(**conn_data) as con:
                                     cur = con.cursor()
                                     cur.execute(q, data)
@@ -368,6 +370,7 @@ def graph_api(data, hosp, fromtime, totime, deferred, **kwargs):
                             print(query, file=fp)
                     if '@odata.nextLink' in graph_data2:
                         query = graph_data2['@odata.nextLink']
+                        flag = 1
                     else:
                         break
     except:
@@ -413,6 +416,8 @@ def imap_(data, hosp, fromtime, totime, deferred, **kwargs):
                         subject = subject.replace(i, '').strip()
                     ins, process = get_ins_process(subject, sender)
                     mid = int(message_number)
+                    if ins == 'big' and process == "settlement":
+                        get_utr_date_from_big(i, mode='imap_', id=mid, hosp=hosp)
                     filename, download_attach = "", True
                     if if_exists_not_blank_attach(subject=subject, date=date, id=mid):
                         continue

@@ -17,4 +17,4 @@ if __name__ == '__main__':
     #     process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')
     hospitals = ['ils', 'ils_dumdum', 'ils_agartala', 'ils_howrah', 'ils_ho']
     hospitals = ['ils_ho']
-    process_mails_in_range(hospitals, "02/02/2021 21:01:00", "01/03/2021 23:59:00", "X", process='settlement')
+    process_mails_in_range(hospitals, "30/01/2021 21:01:00", "01/03/2021 23:59:00", "X", process='settlement')

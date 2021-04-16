@@ -1,11 +1,62 @@
+import base64
 import os
 from datetime import datetime
+import re
 
 import mysql.connector
+from html2text import html2text
 
 from make_log import log_exceptions
-from settings import conn_data, ls_cmd
+from settings import conn_data, ls_cmd, get_parts
 
+
+def get_utr_date_from_big(msg, **kwargs):
+    try:
+        def get_info(data):
+            data_dict = {'utr': "", 'date': ""}
+            r_list = [r"(?<=:).*(?=Date)", r"(?<=Date:).*(?=\s+Thanking you)"]
+            for i, j in zip(r_list, data_dict):
+                tmp = re.compile(i).search(data)
+                if tmp := tmp.group().strip():
+                    data_dict[j] = tmp
+            return data_dict
+
+        data = ""
+        if kwargs['mode'] == 'graph_api':
+            if msg['body']['contentType'] == 'html':
+                data = msg['body']['content']
+                data = html2text(data)
+            elif msg['body']['contentType'] == 'text':
+                data = msg['body']['content']
+
+
+        if kwargs['mode'] == "gmail_api":
+            file_list = [i for i in get_parts(msg['payload'])]
+            for j in file_list:
+                if j['filename'] == '' and j['mimeType'] == 'text/html':
+                    data = j['body']['data']
+                    data = base64.urlsafe_b64decode(data).decode()
+                    if j['mimeType'] == 'text/html':
+                        data = html2text(data)
+
+        if kwargs['mode'] == 'imap_':
+            for part in msg.walk():
+                if part.get_content_type() == 'text/plain':
+                    data = part.get_payload(decode=True)
+                if part.get_content_type() == 'text/html':
+                    data = part.get_payload(decode=True)
+                    data = html2text(data)
+
+        data_dict = get_info(data)
+
+        q = "insert into ins_big_utr_date (`id`, `hosp`, `utr`, `date`) values (%s, %s, %s, %s);"
+        params = [kwargs['id'], kwargs['hosp'], data_dict['utr'], data_dict['date']]
+        with mysql.connector.connect(**conn_data) as con:
+            cur = con.cursor()
+            cur.execute(q, params)
+            con.commit()
+    except:
+        log_exceptions(kwargs)
 
 def settlement_mail_mover(deferred, **kwargs):
     fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")

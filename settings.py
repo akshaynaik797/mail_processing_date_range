@@ -10,7 +10,7 @@ from pathlib import Path
 from dateutil.parser import parse
 from pytz import timezone
 
-timeout = 60 # seconds
+timeout = 6000 # seconds
 mail_time = 15  # minutes
 interval = 300  # seconds
 conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
@@ -106,7 +106,7 @@ def clean_filename(filename):
 
 
 def file_blacklist(filename, **kwargs):
-    fp = filename
+    fp = filename.strip('.')
     filename, file_extension = os.path.splitext(fp)
     ext = ['.pdf', '.htm', '.html', '.PDF', '.xlsx', '.xls']
     if file_extension not in ext:

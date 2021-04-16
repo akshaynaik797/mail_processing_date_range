@@ -24,7 +24,7 @@ from googleapiclient.discovery import build
 from pytz import timezone
 from email.header import decode_header
 
-from common import settlement_mail_mover
+from common import settlement_mail_mover, get_utr_date_from_big
 from make_log import log_exceptions, custom_log_data
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
     hospital_data, timeout, clean_filename, if_exists_not_blank_attach, check_blank_attach, if_exists, ls_cmd, \
@@ -151,9 +151,11 @@ def gmail_api(data, hosp, mail_id, deferred, **kwargs):
                     with open(f'logs/{hosp}_fail_mails.log', 'a') as fp:
                         print(id, subject, date, sep=',', file=fp)
                     continue
+            ins, process = get_ins_process(subject, sender)
+            if ins == 'big' and process == "settlement":
+                get_utr_date_from_big(msg, mode='gmail_api', id=id, hosp=hosp)
             if if_exists_not_blank_attach(subject=subject, date=date, id=id):
                 return False
-            ins, process = get_ins_process(subject, sender)
             flag = 0
             filename, download_attach = "", True
             if 'process' in kwargs:
@@ -266,6 +268,8 @@ def graph_api(data, hosp, mail_id, deferred, **kwargs):
                     b = b.strftime('%d/%m/%Y %H:%M:%S')
                     date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
                     ins, process = get_ins_process(subject, sender)
+                    if ins == 'big' and process == "settlement":
+                        get_utr_date_from_big(i, mode='graph_api', id=i['id'], hosp=hosp)
                     attach_path, download_attach = "", True
                     if if_exists_not_blank_attach(subject=subject, date=date, id=i['id']):
                         continue
@@ -302,12 +306,14 @@ def graph_api(data, hosp, mail_id, deferred, **kwargs):
                                 if i['body']['contentType'] == 'html':
                                     with open(attachfile_path + 'temp.html', 'w') as fp:
                                         fp.write(i['body']['content'])
-                                    pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                    # pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
+                                    html_to_pdf(attachfile_path + 'temp.html', filename)
                                     attach_path = filename
                                 elif i['body']['contentType'] == 'text':
                                     with open(attachfile_path + 'temp.text', 'w') as fp:
                                         fp.write(i['body']['content'])
-                                    pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                    # pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
+                                    html_to_pdf(attachfile_path + 'temp.html', filename)
                                     attach_path = filename
                             # print(date, subject, attach_path, sender, sep='|')
                             if process == 'settlement':
@@ -371,8 +377,10 @@ def imap_(data, hosp, subject, deferred, **kwargs):
                             pass
                     for i in ['\r', '\n', '\t']:
                         subject = subject.replace(i, '').strip()
-                    ins, process = get_ins_process(subject, sender)
                     mid = int(message_number)
+                    ins, process = get_ins_process(subject, sender)
+                    if ins == 'big' and process == "settlement":
+                        get_utr_date_from_big(i, mode='imap_', id=mid, hosp=hosp)
                     filename, download_attach = "", True
                     if if_exists_not_blank_attach(subject=subject, date=date, id=mid):
                         continue
@@ -488,14 +496,15 @@ def mail_storage(hospital, mail_id, subject, deferred, **kwargs):
             imap_(data, hosp, subject, deferred, **kwargs)
 
 if __name__ == '__main__':
-    deferred = ""
-    mid = '1787245182b0311b'
+    deferred = "X"
+    mid = '1780031f488e1622'
+    subject = ''
     hospital = 'noble'
-    # mail_storage(hospital, mid, deferred)
-    # settlement_mail_mover(deferred, id=mid)
 
-    # q = "select hospital, id from settlement_mails where completed='NO_ATTACH'"
-    q = "SELECT hospital, id, subject FROM python.settlement_mails where attach_path = '';"
+    mail_storage(hospital, mid, subject, deferred)
+    settlement_mail_mover(deferred, id=mid)
+
+    q = "SELECT hospital, id, subject FROM settlement_mails where subject like '%Payment against Claim Reference Number%' and attach_path='';"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q)
