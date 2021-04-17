@@ -66,9 +66,9 @@ def get_ins_process(subject, email):
             cur.execute(q2, (ic_id,))
             result = cur.fetchall()
             for sub, pro in result:
-                if 'Intimation No' in subject:
+                if 'Intimation No' in subject and email == 'claims.payment@starhealth.biz':
                     return ('big', 'settlement')
-                if 'STAR HEALTH AND ALLIED INSUR04239' in subject:
+                if 'STAR HEALTH AND ALLIED INSUR04239' in subject and email == 'claims.payment@starhealth.biz':
                     return ('small', 'settlement')
                 if sub in subject:
                     cur.execute(q3, (ic_id,))
@@ -152,7 +152,7 @@ def gmail_api(data, hosp, mail_id, deferred, **kwargs):
                         print(id, subject, date, sep=',', file=fp)
                     continue
             ins, process = get_ins_process(subject, sender)
-            if ins == 'big' and process == "settlement":
+            if ins in ['big'] and process == "settlement":
                 get_utr_date_from_big(msg, mode='gmail_api', id=id, hosp=hosp)
             if if_exists_not_blank_attach(subject=subject, date=date, id=id):
                 return False
@@ -334,7 +334,7 @@ def graph_api(data, hosp, mail_id, deferred, **kwargs):
                         cur.execute(q, data)
                         con.commit()
                 except:
-                    log_exceptions(mid=i['id'], hosp=hosp)
+                    log_exceptions(mid=i, hosp=hosp)
                 signal.alarm(0)
     except:
         log_exceptions(hosp=hosp)
@@ -348,88 +348,85 @@ def imap_(data, hosp, subject, deferred, **kwargs):
         imap_server = imaplib.IMAP4_SSL(host=server)
         table = f'{hosp}_mails'
         imap_server.login(email_id, password)
-        # for i in imap_server.list()[1]:
-        #     l = i.decode().split(' "/" ')
-        #     print(l[0] + " = " + l[1])
         for folder in get_folders(hosp, deferred):
-            with open('logs/folders.log', 'a') as tfp:
-                print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
-            imap_server.select()
-            # imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
-            # Find all emails in inbox and print out the raw email data
-            # _, message_numbers_raw = imap_server.search(None, 'ALL')
-            _, message_numbers_raw = imap_server.search(None, f'(SUBJECT "{subject}")')
-            for message_number in message_numbers_raw[0].split():
-                signal.signal(signal.SIGALRM, alarm_handler)
-                signal.alarm(timeout)
-                try:
-                    _, msg = imap_server.fetch(message_number, '(RFC822)')
-                    message = email.message_from_bytes(msg[0][1])
-                    sender = message['from']
-                    sender = sender.split('<')[-1].replace('>', '')
-                    date = format_date(message['Date'])
-                    subject = message['Subject'].strip()
-                    if '?' in subject:
-                        try:
-                            subject = decode_header(subject)[0][0].decode("utf-8")
-                        except:
-                            log_exceptions(subject=subject, hosp=hosp)
-                            pass
-                    for i in ['\r', '\n', '\t']:
-                        subject = subject.replace(i, '').strip()
-                    mid = int(message_number)
-                    ins, process = get_ins_process(subject, sender)
-                    if ins == 'big' and process == "settlement":
-                        get_utr_date_from_big(i, mode='imap_', id=mid, hosp=hosp)
-                    filename, download_attach = "", True
-                    if if_exists_not_blank_attach(subject=subject, date=date, id=mid):
-                        continue
-                    if 'process' in kwargs:
-                        if kwargs['process'] == process:
-                            download_attach = True
-                        else:
-                            download_attach = False
-                    if 'insurer' in kwargs:
-                        if kwargs['insurer'] == ins:
-                            download_attach = True
-                        else:
-                            download_attach = False
-                    if download_attach == True:
-                        try:
-                            a = save_attachment(message, attachfile_path, email=sender)
-                            if not isinstance(a, list):
-                                filename = attachfile_path + file_no(8) + '.pdf'
-                                pdfkit.from_file(a, filename, configuration=pdfconfig)
+            try:
+                with open('logs/folders.log', 'a') as tfp:
+                    print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
+                imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
+                _, message_numbers_raw = imap_server.search(None, f'(SUBJECT "{subject}")')
+                for message_number in message_numbers_raw[0].split():
+                    signal.signal(signal.SIGALRM, alarm_handler)
+                    signal.alarm(timeout)
+                    try:
+                        _, msg = imap_server.fetch(message_number, '(RFC822)')
+                        message = email.message_from_bytes(msg[0][1])
+                        sender = message['from']
+                        sender = sender.split('<')[-1].replace('>', '')
+                        date = format_date(message['Date'])
+                        subject = message['Subject'].strip()
+                        if '?' in subject:
+                            try:
+                                subject = decode_header(subject)[0][0].decode("utf-8")
+                            except:
+                                log_exceptions(subject=subject, hosp=hosp)
+                                pass
+                        for i in ['\r', '\n', '\t']:
+                            subject = subject.replace(i, '').strip()
+                        mid = int(message_number)
+                        ins, process = get_ins_process(subject, sender)
+                        if ins == 'big' and process == "settlement":
+                            get_utr_date_from_big(i, mode='imap_', id=mid, hosp=hosp)
+                        filename, download_attach = "", True
+                        if if_exists_not_blank_attach(subject=subject, date=date, id=mid):
+                            continue
+                        if 'process' in kwargs:
+                            if kwargs['process'] == process:
+                                download_attach = True
                             else:
-                                filename = a[-1]
-                            if process == 'settlement':
-                                filename = create_settlement_folder(hosp, ins, date, filename)
-                            filename = os.path.abspath(filename)
-                        except:
-                            pass
-                    if check_blank_attach(subject=subject, date=date, id=mid):
-                        q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
-                        data = (filename, subject, date, mid)
-                    if not if_exists(subject=subject, date=date, id=mid):
-                        q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                        data = (
-                        mid, subject, date, str(datetime.now()), filename, '', sender, hosp, ins, process, deferred,
-                        folder)
-                    with mysql.connector.connect(**conn_data) as con:
-                        cur = con.cursor()
-                        cur.execute(q, data)
-                        con.commit()
-                    # with mysql.connector.connect(**conn_data) as con:
-                    #     cur = con.cursor()
-                    #     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                    #     data = (mid, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender, hosp, ins, process, deferred, folder)
-                    #     cur.execute(q, data)
-                    #     con.commit()
-                    #     with open(f'logs/{hosp}_mails_in_db.log', 'a') as fp:
-                    #         print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
-                except:
-                    log_exceptions(subject=subject, date=date, hosp=hosp)
-                signal.alarm(0)
+                                download_attach = False
+                        if 'insurer' in kwargs:
+                            if kwargs['insurer'] == ins:
+                                download_attach = True
+                            else:
+                                download_attach = False
+                        if download_attach == True:
+                            try:
+                                a = save_attachment(message, attachfile_path, email=sender)
+                                if not isinstance(a, list):
+                                    filename = attachfile_path + file_no(8) + '.pdf'
+                                    pdfkit.from_file(a, filename, configuration=pdfconfig)
+                                else:
+                                    filename = a[-1]
+                                if process == 'settlement':
+                                    filename = create_settlement_folder(hosp, ins, date, filename)
+                                filename = os.path.abspath(filename)
+                            except:
+                                pass
+                        if check_blank_attach(subject=subject, date=date, id=mid):
+                            q = "update all_mails set attach_path=%s where subject=%s and date=%s and id=%s"
+                            data = (filename, subject, date, mid)
+                        if not if_exists(subject=subject, date=date, id=mid):
+                            q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            data = (
+                            mid, subject, date, str(datetime.now()), filename, '', sender, hosp, ins, process, deferred,
+                            folder)
+                        with mysql.connector.connect(**conn_data) as con:
+                            cur = con.cursor()
+                            cur.execute(q, data)
+                            con.commit()
+                        # with mysql.connector.connect(**conn_data) as con:
+                        #     cur = con.cursor()
+                        #     q = f"insert into all_mails (`id`,`subject`,`date`,`sys_time`,`attach_path`,`completed`,`sender`,`hospital`,`insurer`,`process`,`deferred`, `mail_folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                        #     data = (mid, subject, date, str(datetime.now()), os.path.abspath(filename), '', sender, hosp, ins, process, deferred, folder)
+                        #     cur.execute(q, data)
+                        #     con.commit()
+                        #     with open(f'logs/{hosp}_mails_in_db.log', 'a') as fp:
+                        #         print(datetime.now(), subject, date, sender, filename, sep=',', file=fp)
+                    except:
+                        log_exceptions(subject=subject, date=date, hosp=hosp)
+                    signal.alarm(0)
+            except:
+                log_exceptions(folder=folder, hosp=hosp)
     except:
         log_exceptions(hosp=hosp)
 
@@ -497,14 +494,14 @@ def mail_storage(hospital, mail_id, subject, deferred, **kwargs):
 
 if __name__ == '__main__':
     deferred = "X"
-    mid = '1780031f488e1622'
-    subject = ''
-    hospital = 'noble'
+    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEMAACae-7OrA5zRZFYI_1LZwhRAAKurcOGAAA='
+    subject = 'Payment against Claim Reference Number:91591180-00 Policy No : 13568274  Proposer Name :SABITA DAS Patient Name :SABITA DAS'
+    hospital = 'ils_ho'
 
-    mail_storage(hospital, mid, subject, deferred)
-    settlement_mail_mover(deferred, id=mid)
+    # mail_storage(hospital, mid, subject, deferred)
+    # settlement_mail_mover(deferred, id=mid)
 
-    q = "SELECT hospital, id, subject FROM settlement_mails where subject like '%Payment against Claim Reference Number%' and attach_path='';"
+    q = "SELECT hospital, id, subject FROM all_mails where hospital = 'ils_ho' and attach_path = '' and process =  'settlement';"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q)

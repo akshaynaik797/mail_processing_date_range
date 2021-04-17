@@ -16,8 +16,8 @@ def get_utr_date_from_big(msg, **kwargs):
             data_dict = {'utr': "", 'date': ""}
             r_list = [r"(?<=:).*(?=Date)", r"(?<=Date:).*(?=\s+Thanking you)"]
             for i, j in zip(r_list, data_dict):
-                tmp = re.compile(i).search(data)
-                if tmp := tmp.group().strip():
+                if tmp := re.compile(i).search(data):
+                    tmp = tmp.group().strip()
                     data_dict[j] = tmp
             return data_dict
 
@@ -49,14 +49,19 @@ def get_utr_date_from_big(msg, **kwargs):
 
         data_dict = get_info(data)
 
+        q1 = "select * from ins_big_utr_date where `id`=%s and hosp=%s and utr=%s limit 1"
+        params1 = [kwargs['id'], kwargs['hosp'], data_dict['utr']]
         q = "insert into ins_big_utr_date (`id`, `hosp`, `utr`, `date`) values (%s, %s, %s, %s);"
         params = [kwargs['id'], kwargs['hosp'], data_dict['utr'], data_dict['date']]
         with mysql.connector.connect(**conn_data) as con:
             cur = con.cursor()
-            cur.execute(q, params)
-            con.commit()
+            cur.execute(q1, params1)
+            r = cur.fetchone()
+            if r is None:
+                cur.execute(q, params)
+                con.commit()
     except:
-        log_exceptions(kwargs)
+        log_exceptions(kwargs=kwargs)
 
 def settlement_mail_mover(deferred, **kwargs):
     fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
