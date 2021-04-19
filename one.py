@@ -310,10 +310,10 @@ def graph_api(data, hosp, mail_id, deferred, **kwargs):
                                     html_to_pdf(attachfile_path + 'temp.html', filename)
                                     attach_path = filename
                                 elif i['body']['contentType'] == 'text':
-                                    with open(attachfile_path + 'temp.text', 'w') as fp:
+                                    with open(attachfile_path + 'temp.txt', 'w') as fp:
                                         fp.write(i['body']['content'])
                                     # pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
-                                    html_to_pdf(attachfile_path + 'temp.html', filename)
+                                    html_to_pdf(attachfile_path + 'temp.txt', filename)
                                     attach_path = filename
                             # print(date, subject, attach_path, sender, sep='|')
                             if process == 'settlement':
@@ -494,14 +494,15 @@ def mail_storage(hospital, mail_id, subject, deferred, **kwargs):
 
 if __name__ == '__main__':
     deferred = "X"
-    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEMAACae-7OrA5zRZFYI_1LZwhRAAKurcOGAAA='
-    subject = 'Payment against Claim Reference Number:91591180-00 Policy No : 13568274  Proposer Name :SABITA DAS Patient Name :SABITA DAS'
+    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEMAACae-7OrA5zRZFYI_1LZwhRAAKurcQ3AAA='
+    subject = 'Payment Advice-BCS_ECS9522021022703190032_18935_952'
     hospital = 'ils_ho'
 
     # mail_storage(hospital, mid, subject, deferred)
     # settlement_mail_mover(deferred, id=mid)
 
-    q = "SELECT hospital, id, subject FROM all_mails where hospital = 'ils_ho' and attach_path = '' and process =  'settlement';"
+    # q = "SELECT hospital, id, subject FROM all_mails where hospital = 'ils_ho' and attach_path = '' and process =  'settlement';"
+    q = "SELECT all_mails.hospital, all_mails.id, all_mails.subject FROM all_mails   INNER JOIN City_Records ON all_mails.id = City_Records.mail_id  where all_mails.process = 'settlement' and   City_Records.hospital like '%ils%' and City_Records.Insurer_name = '' and all_mails.attach_path = ''"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q)
