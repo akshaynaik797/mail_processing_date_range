@@ -85,7 +85,9 @@ def html_to_pdf(src, dst):
     with open(src, 'r') as fp:
         data = fp.read()
     data = remove_img_tags(data)
-    pdfkit.from_string(data, dst, configuration=pdfconfig)
+    with open(src, 'w') as fp:
+        fp.write(data)
+    pdfkit.from_file(src, dst, configuration=pdfconfig)
 
 def file_no(len):
     return str(randint((10 ** (len - 1)), 10 ** len)) + '_'
