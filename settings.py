@@ -10,7 +10,7 @@ from pathlib import Path
 from dateutil.parser import parse
 from pytz import timezone
 
-timeout = 6000 # seconds
+timeout = 60 # seconds
 mail_time = 15  # minutes
 interval = 300  # seconds
 conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",

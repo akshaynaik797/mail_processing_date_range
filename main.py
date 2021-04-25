@@ -16,5 +16,6 @@ if __name__ == '__main__':
     # for i in ['ils', 'ils_dumdum', 'inamdar', 'ils_agartala', 'ils_howrah', 'noble']:
     #     process_mails_in_range(i, "01/02/2021 00:00:01", "06/03/2021 00:00:01", "X", process='settlement')
     hospitals = ['ils', 'ils_dumdum', 'ils_agartala', 'ils_howrah', 'ils_ho']
-    hospitals = ['ils_ho']
-    process_mails_in_range(hospitals, "30/01/2021 21:01:00", "01/03/2021 23:59:00", "X", process='settlement')
+    hospitals = ['noble']
+    process_mails_in_range(hospitals, "24/04/2021 07:32:45", "24/04/2021 08:51:34", "")
+    # mail_mover(hospitals[0], 'Z')
