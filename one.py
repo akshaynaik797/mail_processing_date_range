@@ -172,7 +172,7 @@ def gmail_api(data, hosp, mail_id, deferred, **kwargs):
                 try:
                     flag, file_list = 0, [i for i in get_parts(msg['payload'])]
                     for j in file_list:
-                        if j['filename'] != '' and 'attachmentId' in j['body']:
+                        if j['filename'] != '' and 'attachmentId' in j['body'] and flag == 0:
                             temp = j['filename']
                             if file_blacklist(temp, email=sender):
                                 filename = clean_filename(temp)
@@ -493,16 +493,16 @@ def mail_storage(hospital, mail_id, subject, deferred, **kwargs):
             imap_(data, hosp, subject, deferred, **kwargs)
 
 if __name__ == '__main__':
-    deferred = "X"
-    mid = 'AAMkADI2Mjg0NjE3LTA4MzktNGE4Mi04OGRlLTBjMGIxMDUzNWYwYgBGAAAAAADSI88zKk5GQoRU36hyi-3lBwCae-7OrA5zRZFYI_1LZwhRAAAAAAEMAACae-7OrA5zRZFYI_1LZwhRAAKurcQ3AAA='
+    deferred = "YY"
+    mid = "179501072107e42e"
     subject = 'Payment Advice-BCS_ECS9522021022703190032_18935_952'
-    hospital = 'ils_ho'
+    hospital = 'noble'
 
-    # mail_storage(hospital, mid, subject, deferred)
-    # settlement_mail_mover(deferred, id=mid)
+    mail_storage(hospital, mid, subject, deferred)
+    settlement_mail_mover(deferred, id=mid)
 
-    # q = "SELECT hospital, id, subject FROM all_mails where hospital = 'ils_ho' and attach_path = '' and process =  'settlement';"
-    q = "SELECT all_mails.hospital, all_mails.id, all_mails.subject FROM all_mails   INNER JOIN City_Records ON all_mails.id = City_Records.mail_id  where all_mails.process = 'settlement' and   City_Records.hospital like '%ils%' and City_Records.Insurer_name = '' and all_mails.attach_path = ''"
+    # q = "SELECT hospital, id, subject FROM settlement_mails where hospital = 'noble' and completed != 'X' and date like '%2021%' and sender='paymentvoucher@rakshatpa.com';"
+    q = "select hospital, mail_id, mail_id from stgSettlement where UTRNo = '' and TPAID='big'"
     with mysql.connector.connect(**conn_data) as con:
         cur = con.cursor()
         cur.execute(q)
@@ -510,8 +510,8 @@ if __name__ == '__main__':
     for hospital, mid, subject in result:
         mail_storage(hospital, mid, subject, deferred)
         settlement_mail_mover(deferred, id=mid)
-        with mysql.connector.connect(**conn_data) as con:
-            cur = con.cursor()
-            q = "update settlement_mails set completed='' where id=%s"
-            cur.execute(q, (mid,))
-            con.commit()
+        # with mysql.connector.connect(**conn_data) as con:
+        #     cur = con.cursor()
+        #     q = "update settlement_mails set completed='' where id=%s"
+        #     cur.execute(q, (mid,))
+        #     con.commit()

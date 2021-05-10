@@ -188,7 +188,7 @@ def gmail_api(data, hosp, fromtime, totime, deferred, **kwargs):
                                 try:
                                     flag, file_list = 0, [i for i in get_parts(msg['payload'])]
                                     for j in file_list:
-                                        if j['filename'] != '' and 'attachmentId' in j['body']:
+                                        if j['filename'] != '' and 'attachmentId' in j['body'] and flag == 0:
                                             temp = j['filename']
                                             if file_blacklist(temp, email=sender):
                                                 filename = clean_filename(temp)
