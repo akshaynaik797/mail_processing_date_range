@@ -1,6 +1,23 @@
-import pdfkit
+import signal
+from time import sleep
 
-from settings import pdfconfig
-data = "ils_ho/new_attach/1.txt"
-dst = 'ils_ho/new_attach/22967570_.pdf'
-pdfkit.from_file(data, dst, configuration=pdfconfig)
+timeout = 1
+
+
+class TimeOutException(Exception):
+    pass
+
+
+def alarm_handler(signum, frame):
+    print("ALARM signal received")
+    raise TimeOutException()
+
+
+while 1:
+    try:
+        signal.signal(signal.SIGALRM, alarm_handler)
+        signal.alarm(timeout)
+        sleep(10)
+        signal.alarm(0)
+    except:
+        print('1')
